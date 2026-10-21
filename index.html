@@ -1,0 +1,1501 @@
+<!DOCTYPE html>
+<html lang="id" class="scroll-smooth">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Sistem absensi caberawit al-washiyyah" />
+    <meta name="author" content="Admin" />
+    <title>Sistem Absensi Caberawit Al-Washiyyah</title>
+
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            200: '#c7d2fe',
+                            300: '#a5b4fc',
+                            400: '#818cf8',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            800: '#3730a3',
+                            900: '#312e81',
+                            950: '#1e1b4b',
+                        },
+                        surface: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            200: '#e2e8f0',
+                            300: '#cbd5e1',
+                            400: '#94a3b8',
+                            500: '#64748b',
+                            600: '#475569',
+                            700: '#334155',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                            950: '#020617',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+                    },
+                    boxShadow: {
+                        'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.12)',
+                        'card': '0 4px 24px -2px rgba(0, 0, 0, 0.08)',
+                        'card-hover': '0 12px 40px -4px rgba(0, 0, 0, 0.15)',
+                        'sidebar': '4px 0 24px -2px rgba(0, 0, 0, 0.1)',
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                        'slide-up': 'slideUp 0.5s ease-out forwards',
+                        'slide-right': 'slideRight 0.3s ease-out forwards',
+                        'pulse-slow': 'pulse 3s ease-in-out infinite',
+                        'count-up': 'countUp 0.8s ease-out forwards',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        slideRight: {
+                            '0%': { opacity: '0', transform: 'translateX(-20px)' },
+                            '100%': { opacity: '1', transform: 'translateX(0)' },
+                        },
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts — Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet" />
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+    <!-- ApexCharts -->
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+    <!-- Firebase App + Firestore + Realtime Database -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+
+    <!-- HTML5 QR Code Scanner & Generator (Mobile & Desktop) -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <!-- Custom Stylesheet -->
+    <link rel="stylesheet" href="style.css" />
+</head>
+
+<body class="bg-surface-50 font-sans text-surface-800 antialiased">
+
+    <!-- ============================================================
+         OVERLAY — for mobile sidebar backdrop
+         ============================================================ -->
+    <div id="sidebar-overlay"
+        class="fixed inset-0 z-30 bg-black/40 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300 lg:hidden"
+        onclick="toggleSidebar()">
+    </div>
+
+    <!-- FLEX WRAPPER — sidebar + main side-by-side on desktop -->
+    <div class="flex min-h-screen">
+
+        <!-- ============================================================
+         SIDEBAR NAVIGATION
+         ============================================================ -->
+        <aside id="sidebar" class="fixed top-0 left-0 z-40 h-screen w-72 bg-white border-r border-surface-200/80 shadow-sidebar
+                  transform -translate-x-full transition-transform duration-300 ease-in-out
+                  lg:translate-x-0 lg:sticky lg:top-0 lg:z-30 flex flex-col shrink-0">
+
+            <!-- Logo & Brand -->
+            <div class="flex items-center gap-3 px-6 py-5 border-b border-surface-100">
+                <div
+                    class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-lg shadow-primary-500/30">
+                    <i class="fa-solid fa-fingerprint text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-surface-900 leading-tight">AbsensiKu</h1>
+                    <p class="text-[11px] text-surface-400 font-medium tracking-wide uppercase">Admin Panel</p>
+                </div>
+                <!-- Close button (mobile only) -->
+                <button onclick="toggleSidebar()"
+                    class="ml-auto lg:hidden p-1.5 rounded-lg hover:bg-surface-100 text-surface-400 transition-colors">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Navigation Links -->
+            <nav class="flex-1 px-4 py-5 space-y-1 overflow-y-auto custom-scrollbar">
+                <p class="text-[10px] font-bold text-surface-400 uppercase tracking-widest px-3 mb-3">Menu Utama</p>
+
+                <a href="#" id="nav-dashboard" onclick="navigateTo('dashboard')"
+                    class="nav-link active group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200">
+                    <div
+                        class="nav-icon-wrap w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200">
+                        <i class="fa-solid fa-chart-pie text-[15px]"></i>
+                    </div>
+                    <span>Dashboard</span>
+                </a>
+
+                <a href="#" id="nav-absensi" onclick="navigateTo('absensi')"
+                    class="nav-link group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200">
+                    <div
+                        class="nav-icon-wrap w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200">
+                        <i class="fa-solid fa-clipboard-check text-[15px]"></i>
+                    </div>
+                    <span>Input Absensi</span>
+                </a>
+
+                <a href="#" id="nav-scan" onclick="navigateTo('scan')"
+                    class="nav-link group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200">
+                    <div
+                        class="nav-icon-wrap w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200">
+                        <i class="fa-solid fa-qrcode text-[15px]"></i>
+                    </div>
+                    <span>Scan QR Absensi</span>
+                    <span class="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Auto</span>
+                </a>
+
+                <a href="#" id="nav-rekap" onclick="navigateTo('rekap')"
+                    class="nav-link group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200">
+                    <div
+                        class="nav-icon-wrap w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200">
+                        <i class="fa-solid fa-table-list text-[15px]"></i>
+                    </div>
+                    <span>Rekap Data</span>
+                </a>
+
+                <a href="#" id="nav-karyawan" onclick="navigateTo('karyawan')"
+                    class="nav-link group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200">
+                    <div
+                        class="nav-icon-wrap w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200">
+                        <i class="fa-solid fa-users text-[15px]"></i>
+                    </div>
+                    <span>Data Caberawit</span>
+                </a>
+
+                <div class="pt-4">
+                    <p class="text-[10px] font-bold text-surface-400 uppercase tracking-widest px-3 mb-3">Lainnya</p>
+                </div>
+
+                <a href="#" id="nav-pengaturan" onclick="navigateTo('pengaturan')"
+                    class="nav-link group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200">
+                    <div
+                        class="nav-icon-wrap w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200">
+                        <i class="fa-solid fa-gear text-[15px]"></i>
+                    </div>
+                    <span>Pengaturan</span>
+                </a>
+            </nav>
+
+            <!-- Sidebar Footer -->
+            <div class="px-4 py-4 border-t border-surface-100">
+                <div class="flex items-center gap-3 px-3 py-2">
+                    <div
+                        class="w-9 h-9 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-sm font-bold shadow-md">
+                        A
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-semibold text-surface-800 truncate">Admin</p>
+                        <p class="text-[11px] text-surface-400 truncate">admin@absensi.id</p>
+                    </div>
+                    <button
+                        class="p-1.5 rounded-lg hover:bg-red-50 text-surface-400 hover:text-red-500 transition-colors"
+                        title="Logout">
+                        <i class="fa-solid fa-right-from-bracket text-sm"></i>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ============================================================
+         MAIN CONTENT AREA
+         ============================================================ -->
+        <main id="main-content" class="flex-1 min-h-screen min-w-0 transition-all duration-300">
+
+            <!-- Top Header Bar -->
+            <header class="sticky top-0 z-20 bg-white/80 backdrop-blur-xl border-b border-surface-200/60">
+                <div class="flex items-center justify-between px-4 sm:px-6 lg:px-8 py-3.5">
+                    <!-- Left: Hamburger + Title -->
+                    <div class="flex items-center gap-3">
+                        <button id="sidebar-toggle" onclick="toggleSidebar()"
+                            class="lg:hidden p-2 rounded-xl bg-surface-100 hover:bg-surface-200 text-surface-600 transition-all duration-200 active:scale-95">
+                            <i class="fa-solid fa-bars text-lg"></i>
+                        </button>
+                        <div>
+                            <h2 id="page-title" class="text-lg sm:text-xl font-bold text-surface-900">Dashboard</h2>
+                            <p id="page-subtitle" class="text-xs text-surface-400 hidden sm:block">Ringkasan data
+                                kehadiran hari ini</p>
+                        </div>
+                    </div>
+
+                    <!-- Right: Date + Status + Notification -->
+                    <div class="flex items-center gap-2 sm:gap-3">
+                        <!-- DB Status Badge -->
+                        <button id="connection-status-badge" onclick="openModal('modal-connection-info')"
+                            class="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80 hover:bg-emerald-100 transition-all shadow-sm active:scale-95"
+                            title="Klik untuk info database & panduan Firebase">
+                            <span id="connection-status-dot"
+                                class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <span id="connection-status-text" class="hidden sm:inline">Memeriksa Database...</span>
+                        </button>
+
+                        <div
+                            class="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-50 border border-surface-200/60">
+                            <i class="fa-regular fa-calendar text-primary-500 text-sm"></i>
+                            <span id="current-date" class="text-xs font-medium text-surface-600"></span>
+                        </div>
+                        <button
+                            class="relative p-2.5 rounded-xl bg-surface-50 border border-surface-200/60 hover:bg-surface-100 text-surface-500 transition-all duration-200"
+                            title="Notifikasi">
+                            <i class="fa-regular fa-bell text-base"></i>
+                            <span
+                                class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white"></span>
+                        </button>
+                        <div
+                            class="w-9 h-9 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-sm font-bold shadow-md sm:hidden">
+                            A
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- PAGE CONTENT CONTAINER -->
+            <div class="px-4 sm:px-6 lg:px-8 py-6 max-w-[1440px] mx-auto">
+
+                <!-- ============================
+                 SECTION: DASHBOARD
+                 ============================ -->
+                <section id="section-dashboard" class="page-section">
+
+                    <!-- Stat Cards Grid -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5 mb-8">
+
+                        <!-- Card: Hadir -->
+                        <div class="stat-card group relative overflow-hidden bg-white rounded-2xl border border-surface-200/60 p-5 shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-1 cursor-default animate-slide-up"
+                            style="animation-delay: 0.05s">
+                            <div
+                                class="absolute top-0 right-0 w-28 h-28 bg-emerald-500/5 rounded-full -translate-y-8 translate-x-8 group-hover:scale-150 transition-transform duration-500">
+                            </div>
+                            <div class="flex items-start justify-between relative">
+                                <div>
+                                    <p class="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-1">
+                                        Hadir Hari Ini</p>
+                                    <p id="stat-hadir" class="text-3xl font-extrabold text-surface-900 tabular-nums">0
+                                    </p>
+                                    <div class="flex items-center gap-1.5 mt-2">
+                                        <span
+                                            class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-600 text-[11px] font-semibold">
+                                            <i class="fa-solid fa-arrow-up text-[9px]"></i> 12%
+                                        </span>
+                                        <span class="text-[11px] text-surface-400">vs kemarin</span>
+                                    </div>
+                                </div>
+                                <div
+                                    class="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/25 group-hover:scale-110 transition-transform duration-300">
+                                    <i class="fa-solid fa-user-check text-white text-lg"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card: Izin -->
+                        <div class="stat-card group relative overflow-hidden bg-white rounded-2xl border border-surface-200/60 p-5 shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-1 cursor-default animate-slide-up"
+                            style="animation-delay: 0.15s">
+                            <div
+                                class="absolute top-0 right-0 w-28 h-28 bg-amber-500/5 rounded-full -translate-y-8 translate-x-8 group-hover:scale-150 transition-transform duration-500">
+                            </div>
+                            <div class="flex items-start justify-between relative">
+                                <div>
+                                    <p class="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-1">Izin
+                                    </p>
+                                    <p id="stat-izin" class="text-3xl font-extrabold text-surface-900 tabular-nums">0
+                                    </p>
+                                    <div class="flex items-center gap-1.5 mt-2">
+                                        <span
+                                            class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-600 text-[11px] font-semibold">
+                                            <i class="fa-solid fa-minus text-[9px]"></i> 0%
+                                        </span>
+                                        <span class="text-[11px] text-surface-400">vs kemarin</span>
+                                    </div>
+                                </div>
+                                <div
+                                    class="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/25 group-hover:scale-110 transition-transform duration-300">
+                                    <i class="fa-solid fa-file-signature text-white text-lg"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card: Sakit -->
+                        <div class="stat-card group relative overflow-hidden bg-white rounded-2xl border border-surface-200/60 p-5 shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-1 cursor-default animate-slide-up"
+                            style="animation-delay: 0.25s">
+                            <div
+                                class="absolute top-0 right-0 w-28 h-28 bg-sky-500/5 rounded-full -translate-y-8 translate-x-8 group-hover:scale-150 transition-transform duration-500">
+                            </div>
+                            <div class="flex items-start justify-between relative">
+                                <div>
+                                    <p class="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-1">
+                                        Sakit</p>
+                                    <p id="stat-sakit" class="text-3xl font-extrabold text-surface-900 tabular-nums">0
+                                    </p>
+                                    <div class="flex items-center gap-1.5 mt-2">
+                                        <span
+                                            class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-sky-50 text-sky-600 text-[11px] font-semibold">
+                                            <i class="fa-solid fa-arrow-down text-[9px]"></i> 5%
+                                        </span>
+                                        <span class="text-[11px] text-surface-400">vs kemarin</span>
+                                    </div>
+                                </div>
+                                <div
+                                    class="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center shadow-lg shadow-sky-500/25 group-hover:scale-110 transition-transform duration-300">
+                                    <i class="fa-solid fa-briefcase-medical text-white text-lg"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card: Alpa -->
+                        <div class="stat-card group relative overflow-hidden bg-white rounded-2xl border border-surface-200/60 p-5 shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-1 cursor-default animate-slide-up"
+                            style="animation-delay: 0.35s">
+                            <div
+                                class="absolute top-0 right-0 w-28 h-28 bg-rose-500/5 rounded-full -translate-y-8 translate-x-8 group-hover:scale-150 transition-transform duration-500">
+                            </div>
+                            <div class="flex items-start justify-between relative">
+                                <div>
+                                    <p class="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-1">Alpa
+                                    </p>
+                                    <p id="stat-alpa" class="text-3xl font-extrabold text-surface-900 tabular-nums">0
+                                    </p>
+                                    <div class="flex items-center gap-1.5 mt-2">
+                                        <span
+                                            class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-600 text-[11px] font-semibold">
+                                            <i class="fa-solid fa-arrow-up text-[9px]"></i> 3%
+                                        </span>
+                                        <span class="text-[11px] text-surface-400">vs kemarin</span>
+                                    </div>
+                                </div>
+                                <div
+                                    class="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-400 to-rose-600 flex items-center justify-center shadow-lg shadow-rose-500/25 group-hover:scale-110 transition-transform duration-300">
+                                    <i class="fa-solid fa-user-xmark text-white text-lg"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chart Section -->
+                    <div class="bg-white rounded-2xl border border-surface-200/60 shadow-card p-5 sm:p-6 mb-8 animate-slide-up"
+                        style="animation-delay: 0.4s">
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+                            <div>
+                                <h3 class="text-base font-bold text-surface-900">Statistik Kehadiran</h3>
+                                <p class="text-xs text-surface-400 mt-0.5">Tren kehadiran berdasarkan rentang waktu</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <select id="chart-filter" onchange="updateChart(this.value)"
+                                    class="text-sm font-medium bg-surface-50 border border-surface-200 text-surface-700 rounded-xl px-3 py-2 pr-8 focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 appearance-none cursor-pointer"
+                                    style="background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22%2364748b%22%3E%3Cpath%20fill-rule%3D%22evenodd%22%20d%3D%22M5.23%207.21a.75.75%200%20011.06.02L10%2011.168l3.71-3.938a.75.75%200%20111.08%201.04l-4.25%204.5a.75.75%200%2001-1.08%200l-4.25-4.5a.75.75%200%2001.02-1.06z%22%20clip-rule%3D%22evenodd%22%2F%3E%3C%2Fsvg%3E'); background-repeat: no-repeat; background-position: right 0.5rem center; background-size: 1.25em;">
+                                    <option value="harian">Harian (7 Hari)</option>
+                                    <option value="mingguan" selected>Mingguan (4 Minggu)</option>
+                                    <option value="bulanan">Bulanan (6 Bulan)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="attendance-chart" class="w-full" style="min-height: 320px;"></div>
+                    </div>
+
+                    <!-- Recent Attendance Table -->
+                    <div class="bg-white rounded-2xl border border-surface-200/60 shadow-card overflow-hidden animate-slide-up"
+                        style="animation-delay: 0.5s">
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-5 sm:p-6 pb-2">
+                            <div>
+                                <h3 class="text-base font-bold text-surface-900">Log Absensi Terbaru</h3>
+                                <p id="table-subtitle" class="text-xs text-surface-400 mt-0.5">Data kehadiran yang
+                                    tercatat hari ini</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div class="relative flex-1 sm:flex-initial">
+                                    <i
+                                        class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 text-xs"></i>
+                                    <input id="search-table" type="text" placeholder="Cari nama..."
+                                        oninput="filterTable(this.value)"
+                                        class="text-sm bg-surface-50 border border-surface-200 rounded-xl pl-9 pr-4 py-2 w-full sm:w-48 focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 placeholder:text-surface-400" />
+                                </div>
+                                <button onclick="openQuickAddModal()"
+                                    class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-primary-600 to-primary-700 text-white text-xs font-semibold rounded-xl shadow-md shadow-primary-500/20 hover:from-primary-700 hover:to-primary-800 active:scale-95 transition-all whitespace-nowrap">
+                                    <i class="fa-solid fa-plus text-[10px]"></i> Tambah Absensi
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Filter Toolbar -->
+                        <div
+                            class="flex flex-wrap items-center justify-between gap-3 px-5 sm:px-6 py-2.5 bg-surface-50/70 border-t border-b border-surface-100">
+                            <div class="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
+                                <button onclick="setDashboardStatusFilter('semua')" id="btn-filter-semua"
+                                    class="dash-filter-btn px-2.5 py-1 rounded-lg bg-primary-600 text-white border border-primary-600">Semua</button>
+                                <button onclick="setDashboardStatusFilter('Hadir')" id="btn-filter-hadir"
+                                    class="dash-filter-btn px-2.5 py-1 rounded-lg bg-white text-surface-600 hover:bg-surface-100 border border-surface-200">✅
+                                    Hadir</button>
+                                <button onclick="setDashboardStatusFilter('Izin')" id="btn-filter-izin"
+                                    class="dash-filter-btn px-2.5 py-1 rounded-lg bg-white text-surface-600 hover:bg-surface-100 border border-surface-200">📋
+                                    Izin</button>
+                                <button onclick="setDashboardStatusFilter('Sakit')" id="btn-filter-sakit"
+                                    class="dash-filter-btn px-2.5 py-1 rounded-lg bg-white text-surface-600 hover:bg-surface-100 border border-surface-200">🏥
+                                    Sakit</button>
+                                <button onclick="setDashboardStatusFilter('Alpa')" id="btn-filter-alpa"
+                                    class="dash-filter-btn px-2.5 py-1 rounded-lg bg-white text-surface-600 hover:bg-surface-100 border border-surface-200">❌
+                                    Alpa</button>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-surface-400 font-medium">Jangkauan:</span>
+                                <select id="dashboard-scope-filter" onchange="setDashboardScope(this.value)"
+                                    class="text-xs font-semibold bg-white border border-surface-200 rounded-lg px-2.5 py-1 text-surface-700 focus:ring-1 focus:ring-primary-500 cursor-pointer">
+                                    <option value="today" selected>Hari Ini</option>
+                                    <option value="all">Semua Riwayat</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="overflow-x-auto custom-scrollbar">
+                            <table class="w-full min-w-[600px]">
+                                <thead>
+                                    <tr class="border-b border-surface-100 bg-surface-50/50">
+                                        <th
+                                            class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-6 py-3">
+                                            No</th>
+                                        <th
+                                            class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-6 py-3">
+                                            Nama</th>
+                                        <th
+                                            class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-6 py-3">
+                                            Tanggal</th>
+                                        <th
+                                            class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-6 py-3">
+                                            Jam Masuk</th>
+                                        <th
+                                            class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-6 py-3">
+                                            Status</th>
+                                        <th
+                                            class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-6 py-3">
+                                            Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="attendance-table-body" class="divide-y divide-surface-100">
+                                    <!-- Rows will be injected by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <!-- Empty State -->
+                        <div id="table-empty"
+                            class="hidden flex-col items-center justify-center py-12 px-4 text-center">
+                            <div class="w-16 h-16 rounded-full bg-surface-100 flex items-center justify-center mb-3">
+                                <i class="fa-solid fa-inbox text-2xl text-surface-300"></i>
+                            </div>
+                            <p class="text-sm font-semibold text-surface-700">Belum ada data absensi yang sesuai</p>
+                            <p class="text-xs text-surface-400 mt-1 max-w-sm">Tambahkan data absensi baru melalui tombol Input Absensi atau gunakan menu Scan QR.</p>
+                            <div class="flex flex-wrap items-center justify-center gap-2.5 mt-4">
+                                <button onclick="openQuickAddModal()"
+                                    class="inline-flex items-center gap-1.5 px-4 py-2 bg-primary-600 text-white text-xs font-semibold rounded-xl hover:bg-primary-700 active:scale-95 transition-all shadow-md shadow-primary-500/20">
+                                    <i class="fa-solid fa-plus text-[10px]"></i> Input Absensi
+                                </button>
+                                <button onclick="navigateTo('scan')"
+                                    class="inline-flex items-center gap-1.5 px-4 py-2 bg-surface-100 hover:bg-surface-200 text-surface-700 text-xs font-semibold rounded-xl border border-surface-200 transition-all">
+                                    <i class="fa-solid fa-qrcode text-primary-500"></i> Scan QR Absensi
+                                </button>
+                            </div>
+                        </div>
+                        <!-- Table Footer -->
+                        <div class="flex items-center justify-between px-6 py-4 border-t border-surface-100">
+                            <p class="text-xs text-surface-400">
+                                Menampilkan <span id="table-count" class="font-semibold text-surface-600">0</span> data
+                            </p>
+                            <button onclick="loadMoreData()"
+                                class="text-xs font-semibold text-primary-600 hover:text-primary-700 hover:underline transition-colors">
+                                Muat Lebih Banyak &rarr;
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ============================
+                 SECTION: INPUT ABSENSI
+                 ============================ -->
+                <section id="section-absensi" class="page-section hidden">
+                    <div class="max-w-2xl mx-auto">
+                        <div
+                            class="bg-white rounded-2xl border border-surface-200/60 shadow-card p-6 sm:p-8 animate-slide-up">
+                            <div class="flex items-center gap-3 mb-6">
+                                <div
+                                    class="w-11 h-11 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-lg shadow-primary-500/20">
+                                    <i class="fa-solid fa-clipboard-check text-white text-lg"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-bold text-surface-900">Input Absensi Baru</h3>
+                                    <p class="text-xs text-surface-400">Tambahkan data kehadiran karyawan</p>
+                                </div>
+                            </div>
+
+                            <form id="attendance-form" onsubmit="handleSubmitAbsensi(event)" class="space-y-5">
+                                <!-- Nama Caberawit -->
+                                <div>
+                                    <label for="input-nama" class="block text-sm font-semibold text-surface-700 mb-1.5">
+                                        Nama Caberawit <span class="text-rose-500">*</span>
+                                    </label>
+                                    <div class="relative">
+                                        <i
+                                            class="fa-solid fa-user absolute left-3.5 top-1/2 -translate-y-1/2 text-surface-400 text-sm"></i>
+                                        <input type="text" id="input-nama" name="nama" required list="karyawan-datalist"
+                                            placeholder="Ketik atau pilih nama Caberawit..."
+                                            class="w-full pl-10 pr-4 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 placeholder:text-surface-400" />
+                                        <datalist id="karyawan-datalist"></datalist>
+                                    </div>
+                                </div>
+
+                                <!-- Tanggal & Jam -->
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label for="input-tanggal"
+                                            class="block text-sm font-semibold text-surface-700 mb-1.5">
+                                            Tanggal <span class="text-rose-500">*</span>
+                                        </label>
+                                        <div class="relative">
+                                            <i
+                                                class="fa-regular fa-calendar absolute left-3.5 top-1/2 -translate-y-1/2 text-surface-400 text-sm"></i>
+                                            <input type="date" id="input-tanggal" name="tanggal" required
+                                                class="w-full pl-10 pr-4 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200" />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label for="input-jam"
+                                            class="block text-sm font-semibold text-surface-700 mb-1.5">
+                                            Jam Masuk <span class="text-rose-500">*</span>
+                                        </label>
+                                        <div class="relative">
+                                            <i
+                                                class="fa-regular fa-clock absolute left-3.5 top-1/2 -translate-y-1/2 text-surface-400 text-sm"></i>
+                                            <input type="time" id="input-jam" name="jam" required
+                                                class="w-full pl-10 pr-4 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Status -->
+                                <div>
+                                    <label for="input-status"
+                                        class="block text-sm font-semibold text-surface-700 mb-1.5">
+                                        Status Kehadiran <span class="text-rose-500">*</span>
+                                    </label>
+                                    <div class="relative">
+                                        <i
+                                            class="fa-solid fa-tag absolute left-3.5 top-1/2 -translate-y-1/2 text-surface-400 text-sm"></i>
+                                        <select id="input-status" name="status" required
+                                            class="w-full pl-10 pr-4 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 appearance-none cursor-pointer"
+                                            style="background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22%2364748b%22%3E%3Cpath%20fill-rule%3D%22evenodd%22%20d%3D%22M5.23%207.21a.75.75%200%20011.06.02L10%2011.168l3.71-3.938a.75.75%200%20111.08%201.04l-4.25%204.5a.75.75%200%2001-1.08%200l-4.25-4.5a.75.75%200%2001.02-1.06z%22%20clip-rule%3D%22evenodd%22%2F%3E%3C%2Fsvg%3E'); background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 1.25em;">
+                                            <option value="" disabled selected>Pilih status...</option>
+                                            <option value="Hadir">✅ Hadir</option>
+                                            <option value="Izin">📋 Izin</option>
+                                            <option value="Sakit">🏥 Sakit</option>
+                                            <option value="Alpa">❌ Alpa</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <!-- Keterangan -->
+                                <div>
+                                    <label for="input-keterangan"
+                                        class="block text-sm font-semibold text-surface-700 mb-1.5">
+                                        Keterangan <span class="text-surface-400 font-normal">(opsional)</span>
+                                    </label>
+                                    <textarea id="input-keterangan" name="keterangan" rows="3"
+                                        placeholder="Tambahkan catatan jika diperlukan..."
+                                        class="w-full px-4 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 resize-none placeholder:text-surface-400"></textarea>
+                                </div>
+
+                                <!-- Submit Buttons -->
+                                <div class="flex flex-col sm:flex-row gap-3 pt-2">
+                                    <button type="submit" id="btn-submit"
+                                        class="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-600 to-primary-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-primary-500/25 hover:shadow-xl hover:shadow-primary-500/30 hover:from-primary-700 hover:to-primary-800 active:scale-[0.98] transition-all duration-200">
+                                        <i class="fa-solid fa-paper-plane text-xs"></i>
+                                        Simpan Absensi
+                                    </button>
+                                    <button type="reset"
+                                        class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-surface-100 text-surface-600 text-sm font-semibold rounded-xl hover:bg-surface-200 active:scale-[0.98] transition-all duration-200">
+                                        <i class="fa-solid fa-rotate-left text-xs"></i>
+                                        Reset
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ============================
+                 SECTION: SCAN QR ABSENSI
+                 ============================ -->
+                <section id="section-scan" class="page-section hidden">
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-slide-up">
+                        <!-- Left: Scanner Viewport & Controls (7 cols on lg) -->
+                        <div class="lg:col-span-7 xl:col-span-8 space-y-6">
+                            <div class="bg-white rounded-2xl border border-surface-200/60 shadow-card overflow-hidden">
+                                <!-- Card Header -->
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-5 sm:p-6 border-b border-surface-100">
+                                    <div>
+                                        <div class="flex items-center gap-2">
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 animate-pulse">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> REALTIME QR SCANNER
+                                            </span>
+                                            <span id="scanner-status-badge" class="text-xs font-semibold text-surface-500">
+                                                Siap Pindai
+                                            </span>
+                                        </div>
+                                        <h3 class="text-base font-bold text-surface-900 mt-1">Pindai Barcode QR Caberawit</h3>
+                                        <p class="text-xs text-surface-400">Dekatkan QR Code ke kamera untuk absensi otomatis langsung masuk ke Firebase</p>
+                                    </div>
+
+                                    <!-- Audio toggle & Camera dropdown -->
+                                    <div class="flex items-center gap-2">
+                                        <button type="button" id="btn-toggle-sound" onclick="toggleScanSound()"
+                                            class="p-2.5 rounded-xl border border-surface-200 hover:bg-surface-50 text-surface-600 transition-colors"
+                                            title="Audio Beep Aktif">
+                                            <i id="sound-icon" class="fa-solid fa-volume-high text-xs text-emerald-600"></i>
+                                        </button>
+                                        <select id="camera-select" onchange="onCameraSelected(this.value)"
+                                            class="text-xs font-medium bg-surface-50 border border-surface-200 rounded-xl px-3 py-2 text-surface-700 focus:ring-2 focus:ring-primary-500/30 cursor-pointer max-w-[170px] sm:max-w-[210px] truncate">
+                                            <option value="">Pilih Kamera...</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <!-- Scanner Viewport Area -->
+                                <div class="p-5 sm:p-6 flex flex-col items-center">
+                                    <div class="relative w-full max-w-sm sm:max-w-md aspect-square rounded-2xl overflow-hidden bg-surface-950 shadow-2xl flex items-center justify-center border-2 border-surface-800">
+                                        <!-- Camera Feed Container -->
+                                        <div id="qr-reader" class="w-full h-full flex items-center justify-center overflow-hidden"></div>
+
+                                        <!-- Reticle & Laser Overlay -->
+                                        <div id="scanner-overlay" class="absolute inset-0 pointer-events-none flex flex-col items-center justify-center p-6">
+                                            <div class="relative w-52 h-52 sm:w-64 sm:h-64 border-2 border-dashed border-emerald-400/40 rounded-2xl flex items-center justify-center">
+                                                <div class="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-emerald-400 rounded-tl-lg"></div>
+                                                <div class="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-emerald-400 rounded-tr-lg"></div>
+                                                <div class="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-emerald-400 rounded-bl-lg"></div>
+                                                <div class="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-emerald-400 rounded-br-lg"></div>
+                                                <div class="scanner-laser-line"></div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Inactive State Placeholder -->
+                                        <div id="scanner-placeholder" class="hidden absolute inset-0 bg-surface-900/95 flex flex-col items-center justify-center text-center p-6 z-10">
+                                            <div class="w-16 h-16 rounded-2xl bg-surface-800 flex items-center justify-center mb-3 text-surface-400 text-2xl shadow-inner">
+                                                <i class="fa-solid fa-camera-slash"></i>
+                                            </div>
+                                            <p class="text-sm font-semibold text-white">Kamera Scanner Tidak Aktif</p>
+                                            <p class="text-xs text-surface-400 mt-1 max-w-xs leading-relaxed">
+                                                Klik tombol di bawah untuk menyalakan kamera atau pilih file foto QR Code.
+                                            </p>
+                                            <button type="button" onclick="startQRScanner()"
+                                                class="mt-4 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-semibold rounded-xl transition-all shadow-lg shadow-emerald-600/30">
+                                                <i class="fa-solid fa-play mr-1.5"></i> Nyalakan Kamera
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Controls -->
+                                    <div class="flex flex-wrap items-center justify-center gap-2.5 mt-5 w-full max-w-md">
+                                        <button type="button" id="btn-toggle-camera" onclick="toggleQRScanner()"
+                                            class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-lg shadow-rose-500/25 transition-all">
+                                            <i id="btn-toggle-camera-icon" class="fa-solid fa-stop text-xs"></i>
+                                            <span id="btn-toggle-camera-text">Hentikan Kamera</span>
+                                        </button>
+
+                                        <button type="button" id="btn-switch-camera" onclick="switchCameraFacing()"
+                                            class="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 bg-surface-100 hover:bg-surface-200 text-surface-700 text-xs sm:text-sm font-medium rounded-xl transition-all active:scale-[0.98]">
+                                            <i class="fa-solid fa-camera-rotate"></i>
+                                            <span class="hidden sm:inline">Ganti Kamera</span>
+                                        </button>
+
+                                        <label for="qr-file-input"
+                                            class="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 bg-surface-100 hover:bg-surface-200 text-surface-700 text-xs sm:text-sm font-medium rounded-xl transition-all cursor-pointer active:scale-[0.98]"
+                                            title="Pindai dari file gambar QR">
+                                            <i class="fa-solid fa-image"></i>
+                                            <span class="hidden sm:inline">Unggah Foto</span>
+                                            <input type="file" id="qr-file-input" accept="image/*" class="hidden" onchange="handleQRFileUpload(this)" />
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <!-- Feedback Status Box -->
+                                <div id="scan-feedback-box" class="p-4 mx-6 mb-6 rounded-2xl bg-surface-50 border border-surface-200 transition-all duration-300">
+                                    <div class="flex items-center gap-3">
+                                        <div id="scan-feedback-icon" class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-lg shrink-0">
+                                            <i class="fa-solid fa-qrcode"></i>
+                                        </div>
+                                        <div class="flex-1 min-w-0">
+                                            <p id="scan-feedback-title" class="text-sm font-bold text-surface-900 truncate">Siap Memindai QR Code</p>
+                                            <p id="scan-feedback-desc" class="text-xs text-surface-500">Posisikan barcode QR di dalam bingkai kamera.</p>
+                                        </div>
+                                        <span id="scan-feedback-badge" class="hidden px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-700">
+                                            ✅ HADIR
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right: Live Feed & QR Tools (5 cols on lg) -->
+                        <div class="lg:col-span-5 xl:col-span-4 space-y-6">
+                            <!-- Live Feed Hari Ini -->
+                            <div class="bg-white rounded-2xl border border-surface-200/60 shadow-card p-5 sm:p-6">
+                                <div class="flex items-center justify-between mb-4">
+                                    <div class="flex items-center gap-2.5">
+                                        <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs">
+                                            <i class="fa-solid fa-clock-rotate-left"></i>
+                                        </div>
+                                        <div>
+                                            <h4 class="text-sm font-bold text-surface-900">Hasil Scan Hari Ini</h4>
+                                            <p class="text-[11px] text-surface-400">Total: <span id="qr-scanned-count" class="font-bold text-emerald-600">0</span> orang</p>
+                                        </div>
+                                    </div>
+                                    <span class="text-[10px] font-semibold text-surface-400 font-mono" id="qr-live-clock">--:--</span>
+                                </div>
+
+                                <div id="qr-recent-list" class="space-y-2.5 max-h-[380px] overflow-y-auto custom-scrollbar pr-1">
+                                    <div class="py-8 text-center text-surface-400 text-xs">
+                                        <i class="fa-solid fa-inbox text-2xl mb-2 text-surface-300 block"></i>
+                                        Belum ada yang scan hari ini.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Cetak / Lihat QR Code Caberawit -->
+                            <div class="bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/50 rounded-2xl border border-indigo-100/80 shadow-card p-5 sm:p-6">
+                                <div class="flex items-center gap-3 mb-3">
+                                    <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs shadow-sm shadow-indigo-500/30">
+                                        <i class="fa-solid fa-id-card"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-sm font-bold text-surface-900">QR Code Caberawit</h4>
+                                        <p class="text-[11px] text-surface-500">Lihat atau cetak kartu barcode peserta</p>
+                                    </div>
+                                </div>
+
+                                <p class="text-xs text-surface-600 leading-relaxed mb-4">
+                                    Setiap Caberawit memiliki barcode QR unik. Pilih nama di bawah untuk melihat dan mencetak kartu QR.
+                                </p>
+
+                                <div class="space-y-3">
+                                    <select id="quick-qr-caberawit-select" onchange="if(this.value) openCaberawitQRModal(this.value)"
+                                        class="w-full text-xs font-semibold bg-white border border-surface-200 rounded-xl px-3 py-2.5 text-surface-700 focus:ring-2 focus:ring-primary-500/30 cursor-pointer">
+                                        <option value="">-- Pilih Caberawit untuk Lihat QR --</option>
+                                    </select>
+
+                                    <button type="button" onclick="navigateTo('karyawan')"
+                                        class="w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 bg-white hover:bg-surface-50 text-indigo-700 text-xs font-semibold rounded-xl border border-indigo-200 transition-all shadow-xs">
+                                        <i class="fa-solid fa-users text-xs"></i> Kelola Data Caberawit
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ============================
+                 SECTION: REKAP DATA
+                 ============================ -->
+                <section id="section-rekap" class="page-section hidden">
+                    <div
+                        class="bg-white rounded-2xl border border-surface-200/60 shadow-card overflow-hidden animate-slide-up">
+                        <!-- Filters Row -->
+                        <div
+                            class="flex flex-col sm:flex-row sm:items-end gap-4 p-5 sm:p-6 border-b border-surface-100">
+                            <div class="flex-1">
+                                <h3 class="text-base font-bold text-surface-900 mb-1">Rekap Data Absensi</h3>
+                                <p class="text-xs text-surface-400">Filter dan ekspor data kehadiran</p>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <input type="date" id="filter-start"
+                                    class="text-sm bg-surface-50 border border-surface-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200" />
+                                <span class="text-surface-400 text-xs font-medium">s/d</span>
+                                <input type="date" id="filter-end"
+                                    class="text-sm bg-surface-50 border border-surface-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200" />
+                                <button onclick="filterRekapData()"
+                                    class="inline-flex items-center gap-1.5 px-4 py-2 bg-primary-600 text-white text-sm font-semibold rounded-xl hover:bg-primary-700 active:scale-[0.98] transition-all duration-200 shadow-md shadow-primary-500/20">
+                                    <i class="fa-solid fa-filter text-xs"></i> Filter
+                                </button>
+                                <button onclick="exportCSV()"
+                                    class="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 active:scale-[0.98] transition-all duration-200 shadow-md shadow-emerald-500/20">
+                                    <i class="fa-solid fa-file-csv text-xs"></i> Export
+                                </button>
+                                <button id="btn-delete-selected-rekap" onclick="confirmDeleteSelectedRekap()"
+                                    class="hidden inline-flex items-center gap-1.5 px-3.5 py-2 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white text-xs font-semibold rounded-xl shadow-md shadow-rose-500/20 transition-all whitespace-nowrap">
+                                    <i class="fa-solid fa-trash-can text-xs"></i>
+                                    Hapus Terpilih (<span id="selected-rekap-badge">0</span>)
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Bulk Action Banner for Rekap -->
+                        <div id="rekap-bulk-bar"
+                            class="hidden items-center justify-between px-6 py-2.5 bg-gradient-to-r from-rose-50 via-rose-50/80 to-amber-50/40 border-b border-rose-100 transition-all bulk-bar-enter">
+                            <div class="flex items-center gap-2.5">
+                                <span class="w-6 h-6 rounded-lg bg-rose-600 text-white flex items-center justify-center text-xs font-bold shadow-sm shadow-rose-500/30">
+                                    <i class="fa-solid fa-check"></i>
+                                </span>
+                                <span class="text-xs font-semibold text-rose-900">
+                                    <span id="rekap-bulk-bar-count" class="font-bold">0</span> data absensi dipilih
+                                </span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button type="button" onclick="clearRekapSelection()"
+                                    class="px-3 py-1.5 text-xs font-medium text-surface-600 hover:text-surface-900 bg-white/90 hover:bg-white rounded-lg transition-colors border border-surface-200/60 shadow-xs">
+                                    Batal Pilih
+                                </button>
+                                <button type="button" onclick="confirmDeleteSelectedRekap()"
+                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-semibold rounded-lg shadow-sm shadow-rose-500/25 transition-all">
+                                    <i class="fa-solid fa-trash-can text-[11px]"></i> Hapus Semua Terpilih
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Rekap Table -->
+                        <div class="overflow-x-auto custom-scrollbar">
+                            <table class="w-full min-w-[750px]">
+                                <thead>
+                                    <tr class="border-b border-surface-100 bg-surface-50/50">
+                                        <th class="w-12 px-4 py-3 text-center">
+                                            <input type="checkbox" id="rekap-select-all" onchange="toggleSelectAllRekap(this)"
+                                                class="table-checkbox w-4 h-4 rounded text-primary-600 border-surface-300 focus:ring-primary-500 cursor-pointer"
+                                                title="Pilih Semua Data Absensi" />
+                                        </th>
+                                        <th
+                                            class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-6 py-3">
+                                            No</th>
+                                        <th
+                                            class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-6 py-3">
+                                            Nama</th>
+                                        <th
+                                            class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-6 py-3">
+                                            Tanggal</th>
+                                        <th
+                                            class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-6 py-3">
+                                            Jam Masuk</th>
+                                        <th
+                                            class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-6 py-3">
+                                            Status</th>
+                                        <th
+                                            class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-6 py-3">
+                                            Keterangan</th>
+                                        <th
+                                            class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-6 py-3">
+                                            Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="rekap-table-body" class="divide-y divide-surface-100">
+                                    <!-- Rows will be injected by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="rekap-empty"
+                            class="hidden flex-col items-center justify-center py-16 px-4 text-center">
+                            <div class="w-20 h-20 rounded-full bg-surface-100 flex items-center justify-center mb-4">
+                                <i class="fa-solid fa-database text-3xl text-surface-300"></i>
+                            </div>
+                            <p class="text-sm font-semibold text-surface-500">Data tidak ditemukan</p>
+                            <p class="text-xs text-surface-400 mt-1">Coba ubah filter tanggal Anda.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ============================
+                 SECTION: DATA KARYAWAN
+                 ============================ -->
+                <section id="section-karyawan" class="page-section hidden">
+                    <div
+                        class="bg-white rounded-2xl border border-surface-200/60 shadow-card overflow-hidden animate-slide-up">
+                        <div
+                            class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-5 sm:p-6 border-b border-surface-100">
+                            <div>
+                                <h3 class="text-base font-bold text-surface-900">Data Caberawit</h3>
+                                <p class="text-xs text-surface-400 mt-0.5">Daftar karyawan yang terdaftar dalam sistem
+                                    (<span id="karyawan-count" class="font-semibold text-primary-600">0</span> orang)
+                                </p>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <div class="relative flex-1 sm:flex-initial">
+                                    <i
+                                        class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 text-xs"></i>
+                                    <input id="search-karyawan" type="text" placeholder="Cari karyawan..."
+                                        oninput="filterKaryawanTable(this.value)"
+                                        class="text-sm bg-surface-50 border border-surface-200 rounded-xl pl-9 pr-4 py-2 w-full sm:w-48 focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 placeholder:text-surface-400" />
+                                </div>
+                                <button id="btn-delete-selected-karyawan" onclick="confirmDeleteSelectedKaryawan()"
+                                    class="hidden inline-flex items-center gap-2 px-3.5 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white text-sm font-semibold rounded-xl shadow-lg shadow-rose-500/25 transition-all whitespace-nowrap">
+                                    <i class="fa-solid fa-trash-can text-xs"></i>
+                                    <span>Hapus Terpilih (<span id="selected-karyawan-badge">0</span>)</span>
+                                </button>
+                                <button onclick="showAddKaryawanModal()"
+                                    class="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-primary-500/25 hover:shadow-xl hover:from-primary-700 hover:to-primary-800 active:scale-[0.98] transition-all duration-200 whitespace-nowrap">
+                                    <i class="fa-solid fa-plus text-xs"></i>
+                                    Tambah Karyawan
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Bulk Action Banner for Karyawan -->
+                        <div id="karyawan-bulk-bar"
+                            class="hidden items-center justify-between px-6 py-2.5 bg-gradient-to-r from-rose-50 via-rose-50/80 to-amber-50/40 border-b border-rose-100 transition-all bulk-bar-enter">
+                            <div class="flex items-center gap-2.5">
+                                <span class="w-6 h-6 rounded-lg bg-rose-600 text-white flex items-center justify-center text-xs font-bold shadow-sm shadow-rose-500/30">
+                                    <i class="fa-solid fa-check"></i>
+                                </span>
+                                <span class="text-xs font-semibold text-rose-900">
+                                    <span id="bulk-bar-count" class="font-bold">0</span> karyawan dipilih
+                                </span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button type="button" onclick="clearKaryawanSelection()"
+                                    class="px-3 py-1.5 text-xs font-medium text-surface-600 hover:text-surface-900 bg-white/90 hover:bg-white rounded-lg transition-colors border border-surface-200/60 shadow-xs">
+                                    Batal Pilih
+                                </button>
+                                <button type="button" onclick="confirmDeleteSelectedKaryawan()"
+                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-semibold rounded-lg shadow-md shadow-rose-500/25 transition-all">
+                                    <i class="fa-solid fa-trash-can text-[11px]"></i> Hapus Semua Terpilih
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="overflow-x-auto custom-scrollbar">
+                            <table class="w-full min-w-[650px]">
+                                <thead>
+                                    <tr class="border-b border-surface-100 bg-surface-50/50">
+                                        <th class="w-12 px-4 py-3 text-center">
+                                            <input type="checkbox" id="karyawan-select-all" onchange="toggleSelectAllKaryawan(this)"
+                                                class="table-checkbox w-4 h-4 rounded text-primary-600 border-surface-300 focus:ring-primary-500 cursor-pointer"
+                                                title="Pilih Semua Karyawan" />
+                                        </th>
+                                        <th
+                                            class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-6 py-3">
+                                            No</th>
+                                        <th
+                                            class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-6 py-3">
+                                            Nama Caberawit</th>
+                                        <th
+                                            class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-6 py-3">
+                                            Role</th>
+                                        <th
+                                            class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-6 py-3">
+                                            Kontak / Email</th>
+                                        <th
+                                            class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-6 py-3">
+                                            Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="karyawan-table-body" class="divide-y divide-surface-100">
+                                    <!-- Rows will be injected by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="karyawan-empty"
+                            class="hidden flex-col items-center justify-center py-16 px-4 text-center">
+                            <div class="w-20 h-20 rounded-full bg-surface-100 flex items-center justify-center mb-4">
+                                <i class="fa-solid fa-user-plus text-3xl text-surface-300"></i>
+                            </div>
+                            <p class="text-sm font-semibold text-surface-500">Belum ada karyawan</p>
+                            <p class="text-xs text-surface-400 mt-1">Klik tombol "Tambah Karyawan" untuk memulai.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ============================
+                 SECTION: PENGATURAN
+                 ============================ -->
+                <section id="section-pengaturan" class="page-section hidden">
+                    <div class="max-w-2xl mx-auto space-y-6 animate-slide-up">
+                        <div class="bg-white rounded-2xl border border-surface-200/60 shadow-card p-6 sm:p-8">
+                            <div class="flex items-center gap-3 mb-6">
+                                <div
+                                    class="w-11 h-11 rounded-2xl bg-gradient-to-br from-surface-600 to-surface-800 flex items-center justify-center shadow-lg">
+                                    <i class="fa-solid fa-gear text-white text-lg"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-bold text-surface-900">Pengaturan Sistem</h3>
+                                    <p class="text-xs text-surface-400">Konfigurasi dasar sistem absensi</p>
+                                </div>
+                            </div>
+                            <div class="space-y-5">
+                                <div>
+                                    <label class="block text-sm font-semibold text-surface-700 mb-1.5">Nama
+                                        Perusahaan</label>
+                                    <input type="text" value="PT. Absensi Digital"
+                                        class="w-full px-4 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200" />
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-semibold text-surface-700 mb-1.5">Jam Masuk
+                                            Default</label>
+                                        <input type="time" value="08:00"
+                                            class="w-full px-4 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold text-surface-700 mb-1.5">Jam Pulang
+                                            Default</label>
+                                        <input type="time" value="17:00"
+                                            class="w-full px-4 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-surface-700 mb-1.5">Toleransi
+                                        Keterlambatan (menit)</label>
+                                    <input type="number" value="15"
+                                        class="w-full px-4 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200" />
+                                </div>
+                                <button
+                                    class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-600 to-primary-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-primary-500/25 hover:from-primary-700 hover:to-primary-800 active:scale-[0.98] transition-all duration-200">
+                                    <i class="fa-solid fa-floppy-disk text-xs"></i> Simpan Pengaturan
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Card: Manajemen Data Database -->
+                        <div class="bg-white rounded-2xl border border-surface-200/60 shadow-card p-6 sm:p-8">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div
+                                    class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white shadow-md shadow-indigo-500/25">
+                                    <i class="fa-solid fa-database text-base"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-base font-bold text-surface-900">Manajemen Database</h4>
+                                    <p class="text-xs text-surface-400">Kelola dan bersihkan data kehadiran & caberawit</p>
+                                </div>
+                            </div>
+
+                            <p class="text-xs text-surface-500 mb-5 leading-relaxed">
+                                Sistem menyimpan data asli absensi dan peserta caberawit secara real-time ke Firebase. Seluruh data demo telah dihilangkan. Anda dapat mengosongkan data kapan saja jika ingin memulai dari awal.
+                            </p>
+
+                            <div class="flex flex-wrap items-center gap-3">
+                                <button onclick="clearAllData()"
+                                    class="inline-flex items-center gap-2 px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold rounded-xl border border-rose-200 transition-all active:scale-[0.98]">
+                                    <i class="fa-solid fa-trash-can"></i> Kosongkan Semua Data
+                                </button>
+                                <button onclick="cleanupLegacyDemoData(true)"
+                                    class="inline-flex items-center gap-2 px-4 py-2.5 bg-surface-100 hover:bg-surface-200 text-surface-700 text-xs font-semibold rounded-xl border border-surface-200 transition-all active:scale-[0.98]">
+                                    <i class="fa-solid fa-broom"></i> Bersihkan Sisa Data Demo
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Firebase Config Display -->
+                        <div class="bg-white rounded-2xl border border-surface-200/60 shadow-card p-6 sm:p-8">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center">
+                                        <i class="fa-solid fa-cloud text-amber-600"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-sm font-bold text-surface-900">Koneksi Cloud Firestore</h4>
+                                        <p class="text-xs text-surface-400">Status sinkronisasi real-time ke Google
+                                            Firebase</p>
+                                    </div>
+                                </div>
+                                <button onclick="openModal('modal-connection-info')"
+                                    class="text-xs text-primary-600 font-semibold hover:underline">
+                                    Bantuan Rules &rarr;
+                                </button>
+                            </div>
+                            <div class="bg-surface-900 rounded-xl p-4 overflow-x-auto custom-scrollbar">
+                                <pre class="text-xs text-emerald-400 font-mono leading-relaxed"><code>// Konfigurasi aktif di app.js:
+Project ID : absensi-4d9c8
+Database   : Cloud Firestore (Real-time active)
+Storage    : absensi-4d9c8.firebasestorage.app</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </main>
+
+    </div><!-- END FLEX WRAPPER -->
+
+    <!-- ============================================================
+         MODAL: Lihat & Cetak QR Code Caberawit
+         ============================================================ -->
+    <div id="modal-caberawit-qr" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeModal('modal-caberawit-qr')"></div>
+        <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 sm:p-7 animate-slide-up text-center">
+            <button onclick="closeModal('modal-caberawit-qr')"
+                class="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-surface-100 text-surface-400 transition-colors">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+
+            <!-- Printable ID Badge Card -->
+            <div id="caberawit-qr-card-print" class="p-5 rounded-2xl border border-surface-200 bg-gradient-to-b from-surface-50 to-white shadow-xs">
+                <div class="w-14 h-14 rounded-full bg-gradient-to-br from-primary-600 to-indigo-700 text-white font-bold text-lg flex items-center justify-center mx-auto mb-2.5 shadow-md shadow-primary-500/20"
+                    id="modal-qr-avatar">
+                    CB
+                </div>
+                <h3 id="modal-qr-nama" class="text-base font-bold text-surface-900 leading-tight">Nama Caberawit</h3>
+                <p id="modal-qr-role" class="text-xs text-primary-600 font-semibold mt-1">Caberawit</p>
+                <p id="modal-qr-id" class="text-[10px] text-surface-400 font-mono mt-0.5">ID: -</p>
+
+                <!-- QR Code Box -->
+                <div class="bg-white p-3.5 rounded-2xl border border-surface-200 shadow-sm inline-block my-4">
+                    <div id="modal-qr-code-container" class="flex items-center justify-center min-w-[160px] min-h-[160px]"></div>
+                </div>
+
+                <div class="flex items-center justify-center gap-1.5 text-[11px] text-surface-500">
+                    <i class="fa-solid fa-qrcode text-primary-600 text-xs"></i>
+                    <span>Tunjukkan ke kamera untuk absensi otomatis</span>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2.5 mt-5">
+                <button type="button" onclick="downloadQRCodePNG()"
+                    class="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 bg-surface-100 hover:bg-surface-200 text-surface-700 text-xs font-semibold rounded-xl transition-all active:scale-95">
+                    <i class="fa-solid fa-download text-xs"></i> Unduh PNG
+                </button>
+                <button type="button" onclick="printCaberawitQR()"
+                    class="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded-xl shadow-lg shadow-primary-500/25 active:scale-95 transition-all">
+                    <i class="fa-solid fa-print text-xs"></i> Cetak Kartu
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================
+         MODAL: Konfirmasi Hapus Terpilih / Bulk Delete
+         ============================================================ -->
+    <div id="modal-confirm-bulk-delete" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeModal('modal-confirm-bulk-delete')"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 sm:p-7 animate-slide-up text-center">
+            <button onclick="closeModal('modal-confirm-bulk-delete')"
+                class="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-surface-100 text-surface-400 transition-colors">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <div class="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-4 border border-rose-100 shadow-sm">
+                <i class="fa-solid fa-triangle-exclamation text-2xl"></i>
+            </div>
+            <h3 id="bulk-modal-title" class="text-lg font-bold text-surface-900 mb-1.5">Hapus Data Terpilih?</h3>
+            <p id="bulk-modal-message" class="text-xs text-surface-500 mb-6 leading-relaxed">
+                Apakah Anda yakin ingin menghapus data yang dipilih? Tindakan ini tidak dapat dibatalkan.
+            </p>
+            <div class="flex items-center gap-2.5">
+                <button type="button" onclick="closeModal('modal-confirm-bulk-delete')"
+                    class="flex-1 px-4 py-2.5 bg-surface-100 hover:bg-surface-200 text-surface-700 text-xs font-semibold rounded-xl transition-all">
+                    Batal
+                </button>
+                <button type="button" id="btn-confirm-bulk-action" onclick="executeCurrentBulkDelete()"
+                    class="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl shadow-lg shadow-rose-500/25 active:scale-95 transition-all">
+                    <i class="fa-solid fa-trash-can text-xs"></i> Ya, Hapus Semua
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================
+         MODAL: Tambah Karyawan (CREATE)
+         ============================================================ -->
+    <div id="modal-karyawan" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeModal('modal-karyawan')"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 sm:p-8 animate-slide-up">
+            <button onclick="closeModal('modal-karyawan')"
+                class="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-surface-100 text-surface-400 transition-colors">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <h3 class="text-lg font-bold text-surface-900 mb-1">Tambah Caberawit</h3>
+            <p class="text-xs text-surface-400 mb-5">Masukkan informasi peserta caberawit baru ke dalam sistem</p>
+            <form id="karyawan-form" onsubmit="handleSubmitKaryawan(event)" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold text-surface-700 mb-1.5">Nama Lengkap Caberawit <span
+                            class="text-rose-500">*</span></label>
+                    <input type="text" id="karyawan-nama" required placeholder="Contoh: Muhammad Ali"
+                        class="w-full px-4 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 placeholder:text-surface-400" />
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-surface-700 mb-1.5">Role / Kelompok / Kelas <span
+                            class="text-rose-500">*</span></label>
+                    <input type="text" id="karyawan-jabatan" required placeholder="Contoh: Caberawit Ula / Wustho"
+                        class="w-full px-4 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 placeholder:text-surface-400" />
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-semibold text-surface-700 mb-1.5">Email (Opsional)</label>
+                        <input type="email" id="karyawan-email" placeholder="nama@email.com"
+                            class="w-full px-3 py-2.5 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 placeholder:text-surface-400" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-surface-700 mb-1.5">No. Telepon / WA Wali</label>
+                        <input type="text" id="karyawan-telepon" placeholder="0812xxxx"
+                            class="w-full px-3 py-2.5 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 placeholder:text-surface-400" />
+                    </div>
+                </div>
+                <button type="submit"
+                    class="w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-600 to-primary-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-primary-500/25 hover:from-primary-700 hover:to-primary-800 active:scale-[0.98] transition-all duration-200">
+                    <i class="fa-solid fa-check text-xs"></i> Simpan Data Caberawit
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ============================================================
+         MODAL: Edit Caberawit (UPDATE)
+         ============================================================ -->
+    <div id="modal-edit-karyawan" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeModal('modal-edit-karyawan')"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 sm:p-8 animate-slide-up">
+            <button onclick="closeModal('modal-edit-karyawan')"
+                class="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-surface-100 text-surface-400 transition-colors">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <h3 class="text-lg font-bold text-surface-900 mb-1">Edit Caberawit</h3>
+            <p class="text-xs text-surface-400 mb-5">Perbarui informasi data caberawit</p>
+            <form id="edit-karyawan-form" onsubmit="handleUpdateKaryawan(event)" class="space-y-4">
+                <input type="hidden" id="edit-karyawan-id" />
+                <div>
+                    <label class="block text-sm font-semibold text-surface-700 mb-1.5">Nama Lengkap Caberawit <span
+                            class="text-rose-500">*</span></label>
+                    <input type="text" id="edit-karyawan-nama" required
+                        class="w-full px-4 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200" />
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-surface-700 mb-1.5">Role / Kelompok / Kelas <span
+                            class="text-rose-500">*</span></label>
+                    <input type="text" id="edit-karyawan-jabatan" required
+                        class="w-full px-4 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200" />
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-semibold text-surface-700 mb-1.5">Email</label>
+                        <input type="email" id="edit-karyawan-email"
+                            class="w-full px-3 py-2.5 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-surface-700 mb-1.5">No. Telepon / WA Wali</label>
+                        <input type="text" id="edit-karyawan-telepon"
+                            class="w-full px-3 py-2.5 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200" />
+                    </div>
+                </div>
+                <button type="submit"
+                    class="w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-600 to-primary-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-primary-500/25 hover:from-primary-700 hover:to-primary-800 active:scale-[0.98] transition-all duration-200">
+                    <i class="fa-solid fa-save text-xs"></i> Perbarui Data Caberawit
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ============================================================
+         MODAL: Input Absensi Cepat (CREATE QUICK)
+         ============================================================ -->
+    <div id="modal-quick-absensi" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeModal('modal-quick-absensi')"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 sm:p-8 animate-slide-up">
+            <button onclick="closeModal('modal-quick-absensi')"
+                class="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-surface-100 text-surface-400 transition-colors">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <div class="flex items-center gap-3 mb-2">
+                <div class="w-9 h-9 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center">
+                    <i class="fa-solid fa-bolt text-sm"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-surface-900">Input Absensi Cepat</h3>
+                    <p class="text-xs text-surface-400">Catat kehadiran secara instan</p>
+                </div>
+            </div>
+            <form id="quick-absensi-form" onsubmit="handleQuickSubmitAbsensi(event)" class="space-y-4 mt-4">
+                <div>
+                    <label class="block text-sm font-semibold text-surface-700 mb-1.5">Nama Karyawan <span
+                            class="text-rose-500">*</span></label>
+                    <input type="text" id="quick-nama" required list="karyawan-datalist"
+                        placeholder="Pilih atau ketik nama..."
+                        class="w-full px-4 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200" />
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-semibold text-surface-700 mb-1.5">Tanggal</label>
+                        <input type="date" id="quick-tanggal" required
+                            class="w-full px-3 py-2.5 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-surface-700 mb-1.5">Jam Masuk</label>
+                        <input type="time" id="quick-jam" required
+                            class="w-full px-3 py-2.5 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200" />
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-surface-700 mb-1.5">Status Kehadiran</label>
+                    <select id="quick-status" required
+                        class="w-full px-4 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200">
+                        <option value="Hadir">✅ Hadir</option>
+                        <option value="Izin">📋 Izin</option>
+                        <option value="Sakit">🏥 Sakit</option>
+                        <option value="Alpa">❌ Alpa</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-surface-700 mb-1.5">Keterangan (Opsional)</label>
+                    <input type="text" id="quick-keterangan" placeholder="Catatan atau alasan..."
+                        class="w-full px-4 py-2.5 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 placeholder:text-surface-400" />
+                </div>
+                <button type="submit"
+                    class="w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-600 to-primary-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-primary-500/25 hover:from-primary-700 hover:to-primary-800 active:scale-[0.98] transition-all duration-200">
+                    <i class="fa-solid fa-check text-xs"></i> Simpan Absensi
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ============================================================
+         MODAL: Edit Absensi (UPDATE)
+         ============================================================ -->
+    <div id="modal-edit" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeModal('modal-edit')"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 sm:p-8 animate-slide-up">
+            <button onclick="closeModal('modal-edit')"
+                class="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-surface-100 text-surface-400 transition-colors">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <h3 class="text-lg font-bold text-surface-900 mb-1">Edit Absensi</h3>
+            <p class="text-xs text-surface-400 mb-5">Perbarui data kehadiran karyawan</p>
+            <form id="edit-form" onsubmit="handleUpdateAbsensi(event)" class="space-y-4">
+                <input type="hidden" id="edit-id" />
+                <div>
+                    <label class="block text-sm font-semibold text-surface-700 mb-1.5">Nama</label>
+                    <input type="text" id="edit-nama" required list="karyawan-datalist"
+                        class="w-full px-4 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200" />
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-semibold text-surface-700 mb-1.5">Tanggal</label>
+                        <input type="date" id="edit-tanggal" required
+                            class="w-full px-3 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-surface-700 mb-1.5">Jam Masuk</label>
+                        <input type="time" id="edit-jam" required
+                            class="w-full px-3 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200" />
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-surface-700 mb-1.5">Status</label>
+                    <select id="edit-status" required
+                        class="w-full px-4 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200">
+                        <option value="Hadir">✅ Hadir</option>
+                        <option value="Izin">📋 Izin</option>
+                        <option value="Sakit">🏥 Sakit</option>
+                        <option value="Alpa">❌ Alpa</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-surface-700 mb-1.5">Keterangan</label>
+                    <input type="text" id="edit-keterangan" placeholder="Keterangan tambahan..."
+                        class="w-full px-4 py-2.5 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 placeholder:text-surface-400" />
+                </div>
+                <button type="submit"
+                    class="w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-600 to-primary-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-primary-500/25 hover:from-primary-700 hover:to-primary-800 active:scale-[0.98] transition-all duration-200">
+                    <i class="fa-solid fa-save text-xs"></i> Update Data
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ============================================================
+         MODAL: Info Koneksi & Panduan Rules
+         ============================================================ -->
+    <div id="modal-connection-info" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeModal('modal-connection-info')"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 sm:p-8 animate-slide-up">
+            <button onclick="closeModal('modal-connection-info')"
+                class="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-surface-100 text-surface-400 transition-colors">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center">
+                    <i class="fa-solid fa-shield-halved text-lg"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-surface-900">Status Database & Firebase</h3>
+                    <p class="text-xs text-surface-400">Panduan integrasi Cloud Firestore</p>
+                </div>
+            </div>
+
+            <div class="space-y-4 text-xs text-surface-600 leading-relaxed">
+                <div class="p-4 rounded-xl bg-surface-50 border border-surface-200/80">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="font-bold text-surface-800">Status Saat Ini:</span>
+                        <span id="modal-db-status" class="font-bold text-emerald-600">Terhubung</span>
+                    </div>
+                    <p id="modal-db-desc" class="text-surface-500">Aplikasi membaca dan menulis data ke Firestore
+                        project <b>absensi-4d9c8</b> secara real-time.</p>
+                </div>
+
+                <div class="space-y-2">
+                    <p class="font-bold text-surface-800">💡 Aturan untuk Realtime Database (Sesuai Screenshot Anda):
+                    </p>
+                    <p class="text-surface-500">Karena Anda membuka <b>Realtime Database</b> di Firebase Console,
+                        aturannya harus berformat JSON:</p>
+                </div>
+
+                <div class="bg-surface-900 rounded-xl p-3.5 relative">
+                    <pre class="text-[11px] text-emerald-400 font-mono"><code>{
+  "rules": {
+    ".read": true,
+    ".write": true
+  }
+}</code></pre>
+                </div>
+
+                <div class="space-y-1">
+                    <p class="font-semibold text-surface-700">Jika Menggunakan Cloud Firestore:</p>
+                    <p class="text-surface-400 text-[11px]">Buka menu <b>Firestore Database</b> &rarr; Tab <b>Rules</b>
+                        lalu gunakan
+                        <code>rules_version = '2'; service cloud.firestore { match /databases/{database}/documents { match /{document=**} { allow read, write: if true; } } }</code>
+                    </p>
+                </div>
+
+                <div class="p-3 bg-amber-50 border border-amber-200/80 rounded-xl text-amber-800">
+                    <p><b>Catatan:</b> Jika koneksi Firebase offline atau dibatasi, sistem otomatis beralih ke
+                        <b>Penyimpanan Lokal (LocalStorage)</b> agar seluruh fitur CRUD tetap berjalan lancar tanpa
+                        error.
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3 mt-5">
+                <button onclick="testFirebaseConnection()"
+                    class="flex-1 py-2.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded-xl transition-all shadow-md shadow-primary-500/20 active:scale-95">
+                    <i class="fa-solid fa-arrows-rotate mr-1.5"></i> Tes Ulang Koneksi
+                </button>
+                <button onclick="closeModal('modal-connection-info')"
+                    class="px-4 py-2.5 bg-surface-100 hover:bg-surface-200 text-surface-800 text-xs font-semibold rounded-xl transition-all">
+                    Tutup
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- ============================================================
+         TOAST NOTIFICATION
+         ============================================================ -->
+    <div id="toast-container" class="fixed bottom-6 right-6 z-[60] flex flex-col gap-3 pointer-events-none"></div>
+
+    <!-- Application JavaScript -->
+    <script src="app.js"></script>
+</body>
+
+</html>
