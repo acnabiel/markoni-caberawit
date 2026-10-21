@@ -258,9 +258,34 @@ function setupRealtimeDbListeners() {
     rtdb.ref('karyawan').on('value', (snapshot) => {
         const val = snapshot.val();
         if (val) {
-            allKaryawanData = Object.entries(val)
+            const rawList = Object.entries(val)
                 .map(([id, item]) => ({ id, ...item }))
                 .filter(item => !isDemoRecord(item));
+
+            // Deduplikasi berdasarkan nama peserta (hindari duplikat)
+            const seenNames = new Set();
+            const uniqueList = [];
+            const duplicateIdsToDelete = [];
+
+            rawList.forEach(item => {
+                const cleanName = (item.nama || '').trim().toLowerCase();
+                if (!cleanName) return;
+                if (!seenNames.has(cleanName)) {
+                    seenNames.add(cleanName);
+                    uniqueList.push(item);
+                } else {
+                    duplicateIdsToDelete.push(item.id);
+                }
+            });
+
+            // Hapus duplikat dari Firebase jika ada
+            if (duplicateIdsToDelete.length > 0 && rtdb) {
+                duplicateIdsToDelete.forEach(dupId => {
+                    rtdb.ref(`karyawan/${dupId}`).remove().catch(() => {});
+                });
+            }
+
+            allKaryawanData = uniqueList;
             allKaryawanData.sort((a, b) => (a.nama || '').localeCompare(b.nama || ''));
         } else {
             allKaryawanData = [];
@@ -298,13 +323,37 @@ function setupFirestoreListeners() {
 
     db.collection('karyawan').onSnapshot((snapshot) => {
         if (!snapshot.empty) {
-            allKaryawanData = [];
+            const rawList = [];
             snapshot.forEach(doc => {
                 const item = { id: doc.id, ...doc.data() };
                 if (!isDemoRecord(item)) {
-                    allKaryawanData.push(item);
+                    rawList.push(item);
                 }
             });
+
+            // Deduplikasi berdasarkan nama peserta
+            const seenNames = new Set();
+            const uniqueList = [];
+            const duplicateIdsToDelete = [];
+
+            rawList.forEach(item => {
+                const cleanName = (item.nama || '').trim().toLowerCase();
+                if (!cleanName) return;
+                if (!seenNames.has(cleanName)) {
+                    seenNames.add(cleanName);
+                    uniqueList.push(item);
+                } else {
+                    duplicateIdsToDelete.push(item.id);
+                }
+            });
+
+            if (duplicateIdsToDelete.length > 0 && db) {
+                duplicateIdsToDelete.forEach(dupId => {
+                    db.collection('karyawan').doc(dupId).delete().catch(() => {});
+                });
+            }
+
+            allKaryawanData = uniqueList;
             allKaryawanData.sort((a, b) => (a.nama || '').localeCompare(b.nama || ''));
         } else {
             allKaryawanData = [];
@@ -341,7 +390,16 @@ function loadFromLocalStorage() {
             allAbsensiData = JSON.parse(abs).filter(item => !isDemoRecord(item));
         }
         if (kar) {
-            allKaryawanData = JSON.parse(kar).filter(item => !isDemoRecord(item));
+            const raw = JSON.parse(kar).filter(item => !isDemoRecord(item));
+            const seen = new Set();
+            allKaryawanData = [];
+            raw.forEach(k => {
+                const key = (k.nama || '').trim().toLowerCase();
+                if (key && !seen.has(key)) {
+                    seen.add(key);
+                    allKaryawanData.push(k);
+                }
+            });
         }
 
         updateStatCards();
@@ -390,11 +448,26 @@ async function cleanupLegacyDemoData(notify = false) {
     allAbsensiData = allAbsensiData.filter(item => !isDemoRecord(item));
     allKaryawanData = allKaryawanData.filter(item => !isDemoRecord(item));
 
+    // Bersihkan juga duplikat peserta jika ada nama yang ganda
+    const seenNames = new Set();
+    const cleanKaryawan = [];
+    const duplicateKaryawanToDelete = [];
+    allKaryawanData.forEach(item => {
+        const key = (item.nama || '').trim().toLowerCase();
+        if (key && !seenNames.has(key)) {
+            seenNames.add(key);
+            cleanKaryawan.push(item);
+        } else {
+            duplicateKaryawanToDelete.push(item);
+        }
+    });
+    allKaryawanData = cleanKaryawan;
+
     saveToLocalStorage();
     saveKaryawanToLocalStorage();
     localStorage.removeItem('absensiku_seeded');
 
-    // Hapus juga sisa data demo di Firebase jika terhubung
+    // Hapus juga sisa data demo & duplikat di Firebase jika terhubung
     if (isFirebaseConnected) {
         if (activeEngine === 'rtdb' && rtdb) {
             demoAbsensi.forEach(item => {
@@ -403,11 +476,17 @@ async function cleanupLegacyDemoData(notify = false) {
             demoKaryawan.forEach(item => {
                 rtdb.ref(`karyawan/${item.id}`).remove().catch(() => {});
             });
+            duplicateKaryawanToDelete.forEach(item => {
+                rtdb.ref(`karyawan/${item.id}`).remove().catch(() => {});
+            });
         } else if (activeEngine === 'firestore' && db) {
             demoAbsensi.forEach(item => {
                 db.collection('absensi').doc(item.id).delete().catch(() => {});
             });
             demoKaryawan.forEach(item => {
+                db.collection('karyawan').doc(item.id).delete().catch(() => {});
+            });
+            duplicateKaryawanToDelete.forEach(item => {
                 db.collection('karyawan').doc(item.id).delete().catch(() => {});
             });
         }
@@ -1383,45 +1462,99 @@ function showAddKaryawanModal() {
     openModal('modal-karyawan');
 }
 
+let isSubmittingKaryawan = false;
+
 async function handleSubmitKaryawan(event) {
     event.preventDefault();
 
-    const nama = document.getElementById('karyawan-nama').value.trim();
-    const jabatan = document.getElementById('karyawan-jabatan').value.trim();
-    const email = document.getElementById('karyawan-email')?.value.trim() || '';
-    const telepon = document.getElementById('karyawan-telepon')?.value.trim() || '';
+    if (isSubmittingKaryawan) return;
+
+    const namaInput = document.getElementById('karyawan-nama');
+    const jabatanInput = document.getElementById('karyawan-jabatan');
+    const emailInput = document.getElementById('karyawan-email');
+    const teleponInput = document.getElementById('karyawan-telepon');
+    const submitBtn = document.querySelector('#karyawan-form button[type="submit"]');
+
+    const nama = namaInput ? namaInput.value.trim() : '';
+    const jabatan = jabatanInput ? jabatanInput.value.trim() : '';
+    const email = emailInput ? emailInput.value.trim() : '';
+    const telepon = teleponInput ? teleponInput.value.trim() : '';
 
     if (!nama || !jabatan) {
-        showToast('Mohon isi nama dan jabatan karyawan!', 'error');
+        showToast('Mohon lengkapi nama dan role Caberawit!', 'error');
         return;
     }
 
-    const newKaryawan = { nama, jabatan, email, telepon, createdAt: Date.now() };
-
-    if (isFirebaseConnected) {
-        if (activeEngine === 'rtdb' && rtdb) {
-            try {
-                const newRef = rtdb.ref('karyawan').push();
-                await newRef.set(newKaryawan);
-                newKaryawan.id = newRef.key;
-            } catch (e) { newKaryawan.id = 'karyawan-' + Date.now(); }
-        } else if (activeEngine === 'firestore' && db) {
-            try {
-                const docRef = await db.collection('karyawan').add(newKaryawan);
-                newKaryawan.id = docRef.id;
-            } catch (e) { newKaryawan.id = 'karyawan-' + Date.now(); }
-        }
-    } else {
-        newKaryawan.id = 'karyawan-' + Date.now();
+    // Cek apakah nama peserta sudah pernah ditambahkan untuk menghindari data duplikat
+    const isDuplicate = allKaryawanData.some(k => (k.nama || '').trim().toLowerCase() === nama.toLowerCase());
+    if (isDuplicate) {
+        showToast(`⚠️ Peserta "${nama}" sudah terdaftar sebelumnya!`, 'warning');
+        return;
     }
 
-    allKaryawanData.push(newKaryawan);
-    saveKaryawanToLocalStorage();
-    renderKaryawanTable(allKaryawanData);
-    updateKaryawanDatalist();
+    isSubmittingKaryawan = true;
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i> Menyimpan...';
+    }
 
-    closeModal('modal-karyawan');
-    showToast(`Karyawan ${nama} berhasil ditambahkan!`, 'success');
+    const newKaryawan = { 
+        nama, 
+        jabatan, 
+        email, 
+        telepon, 
+        createdAt: Date.now() 
+    };
+
+    try {
+        if (isFirebaseConnected) {
+            if (activeEngine === 'rtdb' && rtdb) {
+                const newRef = rtdb.ref('karyawan').push();
+                newKaryawan.id = newRef.key;
+                await newRef.set(newKaryawan);
+            } else if (activeEngine === 'firestore' && db) {
+                const docRef = await db.collection('karyawan').add(newKaryawan);
+                newKaryawan.id = docRef.id;
+            }
+        } else {
+            newKaryawan.id = 'caberawit-' + Date.now();
+        }
+
+        // Pastikan hanya masuk 1 kali ke state lokal
+        if (!allKaryawanData.some(k => k.id === newKaryawan.id || (k.nama || '').trim().toLowerCase() === nama.toLowerCase())) {
+            allKaryawanData.push(newKaryawan);
+            allKaryawanData.sort((a, b) => (a.nama || '').localeCompare(b.nama || ''));
+        }
+        saveKaryawanToLocalStorage();
+        renderKaryawanTable(allKaryawanData);
+        updateKaryawanDatalist();
+        updateQuickQRCaberawitSelect();
+
+        // Reset form & TUTUP MODAL
+        document.getElementById('karyawan-form').reset();
+        closeModal('modal-karyawan');
+        showToast(`✅ Data Caberawit "${nama}" berhasil disimpan!`, 'success');
+    } catch (err) {
+        console.error('Error saat menyimpan Caberawit:', err);
+        if (!newKaryawan.id) newKaryawan.id = 'caberawit-' + Date.now();
+        if (!allKaryawanData.some(k => k.id === newKaryawan.id)) {
+            allKaryawanData.push(newKaryawan);
+        }
+        saveKaryawanToLocalStorage();
+        renderKaryawanTable(allKaryawanData);
+        updateKaryawanDatalist();
+        updateQuickQRCaberawitSelect();
+
+        document.getElementById('karyawan-form').reset();
+        closeModal('modal-karyawan');
+        showToast(`Data "${nama}" disimpan (mode lokal).`, 'info');
+    } finally {
+        isSubmittingKaryawan = false;
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fa-solid fa-check text-xs"></i> Simpan Data Caberawit';
+        }
+    }
 }
 
 function openEditKaryawanModal(id) {
@@ -1450,7 +1583,7 @@ async function handleUpdateKaryawan(event) {
         telepon: document.getElementById('edit-karyawan-telepon')?.value.trim() || ''
     };
 
-    if (isFirebaseConnected && !id.startsWith('karyawan-')) {
+    if (isFirebaseConnected) {
         if (activeEngine === 'rtdb' && rtdb) {
             rtdb.ref(`karyawan/${id}`).update(updated).catch(() => {});
         } else if (activeEngine === 'firestore' && db) {
@@ -2184,6 +2317,49 @@ function onQuickQRCaberawitChange(id) {
     renderQuickBadgePreview(id);
 }
 
+function generateQRCodeInto(container, item, size = 180) {
+    if (!container || !item) return;
+    container.innerHTML = '';
+
+    const qrPayload = JSON.stringify({
+        app: "absensiku",
+        id: item.id,
+        nama: item.nama,
+        role: item.jabatan || 'Caberawit'
+    });
+
+    let rendered = false;
+
+    // 1. Coba render menggunakan library QRCode (qrcodejs)
+    if (typeof QRCode !== 'undefined') {
+        try {
+            new QRCode(container, {
+                text: qrPayload,
+                width: size,
+                height: size,
+                colorDark: "#0f172a",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.M
+            });
+            rendered = true;
+        } catch (err) {
+            console.warn('QRCode render exception, using fallback:', err);
+            container.innerHTML = '';
+        }
+    }
+
+    // 2. Fallback otomatis: jika library tidak tersedia / error, gunakan QR image API
+    if (!rendered) {
+        const encoded = encodeURIComponent(qrPayload);
+        const img = document.createElement('img');
+        img.crossOrigin = 'anonymous';
+        img.alt = `QR Code ${item.nama}`;
+        img.className = 'w-[180px] h-[180px] object-contain rounded-lg mx-auto shadow-xs';
+        img.src = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&margin=10&data=${encoded}`;
+        container.appendChild(img);
+    }
+}
+
 function renderQuickBadgePreview(id) {
     const item = allKaryawanData.find(k => k.id === id);
     if (!item) return;
@@ -2197,81 +2373,195 @@ function renderQuickBadgePreview(id) {
     if (roleEl) roleEl.textContent = item.jabatan || 'Peserta Caberawit';
 
     if (wrapper) {
-        wrapper.innerHTML = '';
-        const qrPayload = JSON.stringify({
-            app: "absensiku",
-            id: item.id,
-            nama: item.nama,
-            role: item.jabatan || 'Caberawit'
-        });
-        if (typeof QRCode !== 'undefined') {
-            new QRCode(wrapper, {
-                text: qrPayload,
-                width: 140,
-                height: 140,
-                colorDark: "#0f172a",
-                colorLight: "#ffffff",
-                correctLevel: QRCode.CorrectLevel.H
-            });
-        }
+        generateQRCodeInto(wrapper, item, 140);
     }
 }
 
 function openCaberawitQRModal(id) {
     const item = allKaryawanData.find(k => k.id === id);
-    if (!item) return;
+    if (!item) {
+        showToast('Data peserta tidak ditemukan.', 'error');
+        return;
+    }
 
     currentSelectedQRItem = item;
     const nameEl = document.getElementById('modal-qr-nama');
     const roleEl = document.getElementById('modal-qr-role');
     const idEl = document.getElementById('modal-qr-id');
-    const wrapper = document.getElementById('modal-qr-canvas-wrapper');
+    const avatarEl = document.getElementById('modal-qr-avatar');
+    const container = document.getElementById('modal-qr-code-container') || document.getElementById('modal-qr-canvas-wrapper');
 
     if (nameEl) nameEl.textContent = item.nama;
     if (roleEl) roleEl.textContent = item.jabatan || 'Peserta Caberawit';
     if (idEl) idEl.textContent = `ID: ${item.id}`;
+    if (avatarEl) avatarEl.textContent = getInitials(item.nama);
 
-    if (wrapper) {
-        wrapper.innerHTML = '';
-        const qrPayload = JSON.stringify({
-            app: "absensiku",
-            id: item.id,
-            nama: item.nama,
-            role: item.jabatan || 'Caberawit'
-        });
-        if (typeof QRCode !== 'undefined') {
-            new QRCode(wrapper, {
-                text: qrPayload,
-                width: 180,
-                height: 180,
-                colorDark: "#0f172a",
-                colorLight: "#ffffff",
-                correctLevel: QRCode.CorrectLevel.H
-            });
-        }
+    if (container) {
+        generateQRCodeInto(container, item, 180);
     }
 
     openModal('modal-caberawit-qr');
 }
 
-function downloadModalBadgePNG() {
-    const wrapper = document.getElementById('modal-qr-canvas-wrapper');
-    const canvas = wrapper ? wrapper.querySelector('canvas') : null;
-    const img = wrapper ? wrapper.querySelector('img') : null;
-    let dataUrl = '';
-    if (canvas) {
-        dataUrl = canvas.toDataURL('image/png');
-    } else if (img && img.src) {
-        dataUrl = img.src;
+async function downloadModalBadgePNG() {
+    if (!currentSelectedQRItem) {
+        showToast('Pilih data peserta terlebih dahulu.', 'warning');
+        return;
     }
-    if (dataUrl) {
+
+    const item = currentSelectedQRItem;
+    const container = document.getElementById('modal-qr-code-container') || document.getElementById('modal-qr-canvas-wrapper');
+    if (!container) {
+        showToast('Elemen QR Code tidak ditemukan.', 'error');
+        return;
+    }
+
+    showToast('Menyiapkan berkas kartu QR...', 'info');
+
+    try {
+        const qrCanvas = container.querySelector('canvas');
+        const qrImg = container.querySelector('img');
+
+        let qrSource = null;
+        if (qrCanvas) {
+            qrSource = qrCanvas;
+        } else if (qrImg && qrImg.src) {
+            qrSource = await new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => resolve(img);
+                img.onerror = () => reject(new Error('Gagal memuat gambar QR'));
+                img.src = qrImg.src;
+            });
+        }
+
+        if (!qrSource) {
+            showToast('QR Code belum siap untuk diunduh.', 'error');
+            return;
+        }
+
+        // Render Kartu Tanda Pengenal (ID Badge) resolusi tinggi 500x680 px
+        const cardCanvas = document.createElement('canvas');
+        const ctx = cardCanvas.getContext('2d');
+        const width = 500;
+        const height = 680;
+        cardCanvas.width = width;
+        cardCanvas.height = height;
+
+        // Background putih bersih
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
+
+        // Header Indigo
+        const grad = ctx.createLinearGradient(0, 0, width, 0);
+        grad.addColorStop(0, '#4338ca');
+        grad.addColorStop(1, '#6366f1');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, width, 130);
+
+        // Header Title
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 22px Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('KARTU ABSENSI CABERAWIT', width / 2, 52);
+
+        ctx.font = '13px Arial, sans-serif';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+        ctx.fillText('Absensi Digital Real-time • AbsensiKu', width / 2, 78);
+
+        // Avatar Bulat
+        ctx.beginPath();
+        ctx.arc(width / 2, 130, 40, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = '#e0e7ff';
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(width / 2, 130, 36, 0, Math.PI * 2);
+        ctx.fillStyle = '#4f46e5';
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 24px Arial, sans-serif';
+        ctx.textBaseline = 'middle';
+        ctx.textAlign = 'center';
+        ctx.fillText(getInitials(item.nama), width / 2, 130);
+
+        // Nama Lengkap Peserta
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'bold 22px Arial, sans-serif';
+        let namaDisplay = item.nama;
+        if (namaDisplay.length > 26) {
+            namaDisplay = namaDisplay.substring(0, 24) + '...';
+        }
+        ctx.fillText(namaDisplay, width / 2, 210);
+
+        // Role / Kelompok
+        ctx.fillStyle = '#4f46e5';
+        ctx.font = 'bold 15px Arial, sans-serif';
+        ctx.fillText(item.jabatan || 'Peserta Caberawit', width / 2, 238);
+
+        // ID Unik
+        ctx.fillStyle = '#64748b';
+        ctx.font = '13px monospace';
+        ctx.fillText(`ID: ${item.id}`, width / 2, 262);
+
+        // Box QR Code di tengah
+        const boxSize = 270;
+        const boxX = (width - boxSize) / 2;
+        const boxY = 285;
+
+        ctx.fillStyle = '#f8fafc';
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = 2;
+        if (ctx.roundRect) {
+            ctx.beginPath();
+            ctx.roundRect(boxX, boxY, boxSize, boxSize, 18);
+            ctx.fill();
+            ctx.stroke();
+        } else {
+            ctx.fillRect(boxX, boxY, boxSize, boxSize);
+            ctx.strokeRect(boxX, boxY, boxSize, boxSize);
+        }
+
+        // Gambar QR Code di tengah box
+        const pad = 18;
+        ctx.drawImage(qrSource, boxX + pad, boxY + pad, boxSize - (pad * 2), boxSize - (pad * 2));
+
+        // Teks instruksi di bawah
+        ctx.fillStyle = '#64748b';
+        ctx.font = '13px Arial, sans-serif';
+        ctx.fillText('Pindai barcode ini ke kamera scanner untuk absensi', width / 2, 595);
+
+        // Border luar kartu
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(1, 1, width - 2, height - 2);
+
+        // Trigger Download
+        const cleanName = (item.nama || 'Caberawit').replace(/[^a-zA-Z0-9_-]/g, '_');
         const link = document.createElement('a');
-        link.download = `QR-Caberawit-${(currentSelectedQRItem?.nama || 'Peserta').replace(/\s+/g, '_')}.png`;
-        link.href = dataUrl;
+        link.download = `QR-Badge-${cleanName}.png`;
+        link.href = cardCanvas.toDataURL('image/png');
         link.click();
-        showToast('QR Code berhasil diunduh!', 'success');
-    } else {
-        showToast('Gagal mengunduh QR Code.', 'error');
+
+        showToast(`✅ Kartu QR "${item.nama}" berhasil diunduh!`, 'success');
+    } catch (err) {
+        console.error('Download QR Error:', err);
+        const rawCanvas = container.querySelector('canvas');
+        if (rawCanvas) {
+            const cleanName = (item.nama || 'Caberawit').replace(/[^a-zA-Z0-9_-]/g, '_');
+            const link = document.createElement('a');
+            link.download = `QR-${cleanName}.png`;
+            link.href = rawCanvas.toDataURL('image/png');
+            link.click();
+            showToast('QR Code berhasil diunduh!', 'success');
+        } else {
+            showToast('Gagal memproses unduhan kartu QR.', 'error');
+        }
     }
 }
 
@@ -2282,35 +2572,5 @@ function printModalBadge() {
 // Aliases for compatibility
 const downloadQRCodePNG = downloadModalBadgePNG;
 const printCaberawitQR = printModalBadge;
-
-function downloadQuickBadgePNG() {
-    const wrapper = document.getElementById('quick-badge-qr');
-    const canvas = wrapper ? wrapper.querySelector('canvas') : null;
-    const img = wrapper ? wrapper.querySelector('img') : null;
-    let dataUrl = '';
-    if (canvas) {
-        dataUrl = canvas.toDataURL('image/png');
-    } else if (img && img.src) {
-        dataUrl = img.src;
-    }
-    if (dataUrl) {
-        const link = document.createElement('a');
-        link.download = `QR-Caberawit-${(currentSelectedQRItem?.nama || 'Peserta').replace(/\s+/g, '_')}.png`;
-        link.href = dataUrl;
-        link.click();
-        showToast('QR Code berhasil diunduh!', 'success');
-    } else {
-        showToast('Pilih caberawit terlebih dahulu untuk mengunduh QR.', 'warning');
-    }
-}
-
-function printQuickBadge() {
-    if (currentSelectedQRItem) {
-        openCaberawitQRModal(currentSelectedQRItem.id);
-        setTimeout(() => {
-            window.print();
-        }, 300);
-    } else {
-        showToast('Pilih caberawit terlebih dahulu.', 'warning');
-    }
-}
+const downloadQuickBadgePNG = downloadModalBadgePNG;
+const printQuickBadge = printModalBadge;
