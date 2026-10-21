@@ -1675,6 +1675,7 @@ function navigateTo(page) {
         scan: { title: 'Scan QR Absensi', subtitle: 'Pindai barcode QR untuk absensi otomatis (Mobile & Desktop)' },
         rekap: { title: 'Rekap Data', subtitle: 'Filter dan kelola data absensi' },
         karyawan: { title: 'Data Caberawit', subtitle: 'Kelola data peserta caberawit terdaftar' },
+        jurnal: { title: 'Jurnal Guru & KBM', subtitle: 'Catatan kegiatan belajar mengajar harian' },
         pengaturan: { title: 'Pengaturan', subtitle: 'Konfigurasi sistem & database absensi' }
     };
 
@@ -1688,6 +1689,8 @@ function navigateTo(page) {
         filterRekapData();
     } else if (page === 'karyawan') {
         renderKaryawanTable(allKaryawanData);
+    } else if (page === 'jurnal') {
+        renderJurnalData();
     }
 
     const sidebar = document.getElementById('sidebar');
@@ -2574,3 +2577,651 @@ const downloadQRCodePNG = downloadModalBadgePNG;
 const printCaberawitQR = printModalBadge;
 const downloadQuickBadgePNG = downloadModalBadgePNG;
 const printQuickBadge = printModalBadge;
+
+
+// -----------------------------------------------
+// 20. JURNAL GURU & KBM — Full CRUD Module
+// -----------------------------------------------
+
+let allJurnalData = [];
+let filteredJurnalData = [];
+let pendingDeleteJurnalId = null;
+
+// --- INITIALIZATION & DATA LOADING ---
+
+function initJurnalModule() {
+    loadJurnalFromLocalStorage();
+    if (activeEngine === 'rtdb' && rtdb) {
+        setupJurnalRtdbListener();
+    } else if (activeEngine === 'firestore' && db) {
+        setupJurnalFirestoreListener();
+    }
+    renderJurnalData();
+}
+
+function setupJurnalRtdbListener() {
+    if (!rtdb) return;
+    rtdb.ref('jurnal').on('value', (snapshot) => {
+        const val = snapshot.val();
+        if (val) {
+            allJurnalData = Object.entries(val)
+                .map(([id, item]) => ({ id, ...item }))
+                .sort((a, b) => {
+                    const tA = Number(a.timestamp) || new Date(`${a.tanggal} ${a.jam || '00:00'}`).getTime() || 0;
+                    const tB = Number(b.timestamp) || new Date(`${b.tanggal} ${b.jam || '00:00'}`).getTime() || 0;
+                    return tB - tA;
+                });
+        } else {
+            allJurnalData = [];
+        }
+        saveJurnalToLocalStorage();
+        renderJurnalData();
+    });
+}
+
+function setupJurnalFirestoreListener() {
+    if (!db) return;
+    db.collection('jurnal').onSnapshot((snapshot) => {
+        if (!snapshot.empty) {
+            allJurnalData = [];
+            snapshot.forEach(doc => {
+                allJurnalData.push({ id: doc.id, ...doc.data() });
+            });
+            allJurnalData.sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
+        } else {
+            allJurnalData = [];
+        }
+        saveJurnalToLocalStorage();
+        renderJurnalData();
+    });
+}
+
+function saveJurnalToLocalStorage() {
+    try {
+        localStorage.setItem('absensiku_jurnal', JSON.stringify(allJurnalData));
+    } catch (e) {}
+}
+
+function loadJurnalFromLocalStorage() {
+    try {
+        const data = localStorage.getItem('absensiku_jurnal');
+        if (data) {
+            allJurnalData = JSON.parse(data);
+        }
+    } catch (e) {}
+}
+
+// --- MODAL HANDLERS ---
+
+function openAddJurnalModal() {
+    document.getElementById('jurnal-edit-id').value = '';
+    document.getElementById('jurnal-form').reset();
+    document.getElementById('jurnal-modal-title').textContent = 'Catat Jurnal KBM';
+    document.getElementById('jurnal-submit-text').textContent = 'Simpan Jurnal KBM';
+
+    // Set default date and time
+    const now = new Date();
+    document.getElementById('jurnal-tanggal').value = formatDateISO(now);
+    document.getElementById('jurnal-jam').value = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+    openModal('modal-jurnal');
+}
+
+function openEditJurnalModal(id) {
+    const item = allJurnalData.find(j => j.id === id);
+    if (!item) return;
+
+    document.getElementById('jurnal-edit-id').value = id;
+    document.getElementById('jurnal-modal-title').textContent = 'Edit Jurnal KBM';
+    document.getElementById('jurnal-submit-text').textContent = 'Perbarui Jurnal';
+
+    document.getElementById('jurnal-guru').value = item.guru || '';
+    document.getElementById('jurnal-tanggal').value = item.tanggal || '';
+    document.getElementById('jurnal-jam').value = item.jam || '';
+    document.getElementById('jurnal-kelas').value = item.kelas || '';
+    document.getElementById('jurnal-mapel').value = item.mapel || '';
+    document.getElementById('jurnal-materi').value = item.materi || '';
+    document.getElementById('jurnal-kegiatan').value = item.kegiatan || '';
+    document.getElementById('jurnal-hadir').value = item.hadir || '';
+    document.getElementById('jurnal-tidak-hadir').value = item.tidakHadir || '';
+    document.getElementById('jurnal-catatan').value = item.catatan || '';
+
+    openModal('modal-jurnal');
+}
+
+function showJurnalDetail(id) {
+    const item = allJurnalData.find(j => j.id === id);
+    if (!item) return;
+
+    const tanggalFormatted = item.tanggal ? new Date(item.tanggal + 'T00:00:00').toLocaleDateString('id-ID', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    }) : '-';
+
+    const totalSantri = (parseInt(item.hadir) || 0) + (parseInt(item.tidakHadir) || 0);
+    const pctHadir = totalSantri > 0 ? Math.round(((parseInt(item.hadir) || 0) / totalSantri) * 100) : 0;
+
+    const container = document.getElementById('jurnal-detail-content');
+    container.innerHTML = `
+        <div class="bg-gradient-to-br from-primary-50 to-indigo-50 rounded-2xl p-4 border border-primary-100">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-white shadow-md">
+                    <i class="fa-solid fa-chalkboard-user text-sm"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-bold text-surface-900">${escapeHtml(item.guru || '-')}</p>
+                    <p class="text-[11px] text-surface-500">${tanggalFormatted} • ${escapeHtml(item.jam || '-')} WIB</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+            <div class="bg-surface-50 rounded-xl p-3 border border-surface-100">
+                <p class="text-[10px] text-surface-400 font-semibold uppercase mb-0.5">Kelas</p>
+                <p class="text-xs font-bold text-surface-800">${escapeHtml(item.kelas || '-')}</p>
+            </div>
+            <div class="bg-surface-50 rounded-xl p-3 border border-surface-100">
+                <p class="text-[10px] text-surface-400 font-semibold uppercase mb-0.5">Mata Pelajaran</p>
+                <p class="text-xs font-bold text-surface-800">${escapeHtml(item.mapel || '-')}</p>
+            </div>
+        </div>
+
+        <div class="bg-surface-50 rounded-xl p-3 border border-surface-100">
+            <p class="text-[10px] text-surface-400 font-semibold uppercase mb-1">
+                <i class="fa-solid fa-file-lines text-primary-400 mr-0.5"></i> Materi Pokok
+            </p>
+            <p class="text-xs text-surface-800 leading-relaxed">${escapeHtml(item.materi || '-')}</p>
+        </div>
+
+        ${item.kegiatan ? `
+        <div class="bg-surface-50 rounded-xl p-3 border border-surface-100">
+            <p class="text-[10px] text-surface-400 font-semibold uppercase mb-1">
+                <i class="fa-solid fa-pen-clip text-primary-400 mr-0.5"></i> Kegiatan
+            </p>
+            <p class="text-xs text-surface-800 leading-relaxed">${escapeHtml(item.kegiatan)}</p>
+        </div>` : ''}
+
+        <div class="grid grid-cols-3 gap-2">
+            <div class="bg-emerald-50 rounded-xl p-3 text-center border border-emerald-100">
+                <p class="text-lg font-extrabold text-emerald-600">${item.hadir || 0}</p>
+                <p class="text-[10px] font-semibold text-emerald-600/70">Hadir</p>
+            </div>
+            <div class="bg-rose-50 rounded-xl p-3 text-center border border-rose-100">
+                <p class="text-lg font-extrabold text-rose-600">${item.tidakHadir || 0}</p>
+                <p class="text-[10px] font-semibold text-rose-600/70">Absen</p>
+            </div>
+            <div class="bg-primary-50 rounded-xl p-3 text-center border border-primary-100">
+                <p class="text-lg font-extrabold text-primary-600">${pctHadir}%</p>
+                <p class="text-[10px] font-semibold text-primary-600/70">% Hadir</p>
+            </div>
+        </div>
+
+        ${item.catatan ? `
+        <div class="bg-amber-50 rounded-xl p-3 border border-amber-100">
+            <p class="text-[10px] text-amber-700 font-semibold uppercase mb-1">
+                <i class="fa-solid fa-clipboard-check text-amber-500 mr-0.5"></i> Catatan Evaluasi
+            </p>
+            <p class="text-xs text-amber-900 leading-relaxed">${escapeHtml(item.catatan)}</p>
+        </div>` : ''}
+
+        <div class="flex items-center gap-2 pt-2">
+            <button onclick="closeModal('modal-jurnal-detail'); openEditJurnalModal('${item.id}')"
+                class="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 bg-primary-50 hover:bg-primary-100 text-primary-700 text-xs font-semibold rounded-xl border border-primary-200 transition-all">
+                <i class="fa-solid fa-pen-to-square text-[10px]"></i> Edit
+            </button>
+            <button onclick="closeModal('modal-jurnal-detail'); confirmDeleteJurnal('${item.id}')"
+                class="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold rounded-xl border border-rose-200 transition-all">
+                <i class="fa-solid fa-trash-can text-[10px]"></i> Hapus
+            </button>
+        </div>
+    `;
+
+    openModal('modal-jurnal-detail');
+}
+
+// --- CRUD OPERATIONS ---
+
+async function handleSubmitJurnal(event) {
+    event.preventDefault();
+
+    const editId = document.getElementById('jurnal-edit-id').value;
+    const data = {
+        guru: document.getElementById('jurnal-guru').value.trim(),
+        tanggal: document.getElementById('jurnal-tanggal').value,
+        jam: document.getElementById('jurnal-jam').value,
+        kelas: document.getElementById('jurnal-kelas').value,
+        mapel: document.getElementById('jurnal-mapel').value,
+        materi: document.getElementById('jurnal-materi').value.trim(),
+        kegiatan: document.getElementById('jurnal-kegiatan').value.trim(),
+        hadir: parseInt(document.getElementById('jurnal-hadir').value) || 0,
+        tidakHadir: parseInt(document.getElementById('jurnal-tidak-hadir').value) || 0,
+        catatan: document.getElementById('jurnal-catatan').value.trim(),
+        timestamp: Date.now()
+    };
+
+    try {
+        if (editId) {
+            // UPDATE
+            if (activeEngine === 'rtdb' && rtdb) {
+                await rtdb.ref(`jurnal/${editId}`).update(data);
+            } else if (activeEngine === 'firestore' && db) {
+                await db.collection('jurnal').doc(editId).update(data);
+            } else {
+                const idx = allJurnalData.findIndex(j => j.id === editId);
+                if (idx !== -1) allJurnalData[idx] = { ...allJurnalData[idx], ...data };
+                saveJurnalToLocalStorage();
+                renderJurnalData();
+            }
+            showToast('Jurnal KBM berhasil diperbarui!', 'success');
+        } else {
+            // CREATE
+            if (activeEngine === 'rtdb' && rtdb) {
+                await rtdb.ref('jurnal').push(data);
+            } else if (activeEngine === 'firestore' && db) {
+                await db.collection('jurnal').add(data);
+            } else {
+                data.id = 'jurnal-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
+                allJurnalData.unshift(data);
+                saveJurnalToLocalStorage();
+                renderJurnalData();
+            }
+            showToast('Jurnal KBM baru berhasil disimpan!', 'success');
+        }
+    } catch (err) {
+        console.error('Jurnal save error:', err);
+        showToast('Gagal menyimpan jurnal. Coba lagi.', 'error');
+    }
+
+    closeModal('modal-jurnal');
+}
+
+function confirmDeleteJurnal(id) {
+    pendingDeleteJurnalId = id;
+    openModal('modal-delete-jurnal');
+}
+
+async function executeDeleteJurnal() {
+    if (!pendingDeleteJurnalId) return;
+
+    try {
+        if (activeEngine === 'rtdb' && rtdb) {
+            await rtdb.ref(`jurnal/${pendingDeleteJurnalId}`).remove();
+        } else if (activeEngine === 'firestore' && db) {
+            await db.collection('jurnal').doc(pendingDeleteJurnalId).delete();
+        } else {
+            allJurnalData = allJurnalData.filter(j => j.id !== pendingDeleteJurnalId);
+            saveJurnalToLocalStorage();
+            renderJurnalData();
+        }
+        showToast('Jurnal berhasil dihapus.', 'success');
+    } catch (err) {
+        console.error('Delete jurnal error:', err);
+        showToast('Gagal menghapus jurnal.', 'error');
+    }
+
+    pendingDeleteJurnalId = null;
+    closeModal('modal-delete-jurnal');
+}
+
+// --- RENDERING ---
+
+function renderJurnalData() {
+    filterJurnalTable();
+}
+
+function filterJurnalTable() {
+    const searchEl = document.getElementById('search-jurnal');
+    const periodeEl = document.getElementById('filter-jurnal-periode');
+    const tanggalEl = document.getElementById('filter-jurnal-tanggal');
+    const kelasEl = document.getElementById('filter-jurnal-kelas');
+    const mapelEl = document.getElementById('filter-jurnal-mapel');
+
+    const searchTerm = (searchEl?.value || '').toLowerCase().trim();
+    const periode = periodeEl?.value || 'semua';
+    const tanggalFilter = tanggalEl?.value || '';
+    const kelasFilter = kelasEl?.value || 'semua';
+    const mapelFilter = mapelEl?.value || 'semua';
+
+    const todayStr = formatDateISO(new Date());
+    const now = new Date();
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - now.getDay());
+    const weekStartStr = formatDateISO(weekStart);
+    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+
+    filteredJurnalData = allJurnalData.filter(item => {
+        // Search filter
+        if (searchTerm) {
+            const searchable = `${item.guru || ''} ${item.materi || ''} ${item.kelas || ''} ${item.mapel || ''} ${item.kegiatan || ''} ${item.catatan || ''}`.toLowerCase();
+            if (!searchable.includes(searchTerm)) return false;
+        }
+
+        // Specific date filter
+        if (tanggalFilter && item.tanggal !== tanggalFilter) return false;
+
+        // Periode filter
+        if (periode === 'hari-ini' && item.tanggal !== todayStr) return false;
+        if (periode === 'minggu-ini' && item.tanggal < weekStartStr) return false;
+        if (periode === 'bulan-ini' && item.tanggal < monthStart) return false;
+
+        // Kelas filter
+        if (kelasFilter !== 'semua' && item.kelas !== kelasFilter) return false;
+
+        // Mapel filter
+        if (mapelFilter !== 'semua' && item.mapel !== mapelFilter) return false;
+
+        return true;
+    });
+
+    renderJurnalTable(filteredJurnalData);
+    renderJurnalCardList(filteredJurnalData);
+    updateJurnalStats();
+}
+
+function renderJurnalTable(data) {
+    const tbody = document.getElementById('jurnal-table-body');
+    const emptyEl = document.getElementById('jurnal-empty');
+    const countEl = document.getElementById('jurnal-count');
+
+    if (!tbody) return;
+
+    if (countEl) countEl.textContent = data.length;
+
+    if (data.length === 0) {
+        tbody.innerHTML = '';
+        if (emptyEl) emptyEl.classList.remove('hidden'), emptyEl.classList.add('flex');
+        return;
+    }
+
+    if (emptyEl) emptyEl.classList.add('hidden'), emptyEl.classList.remove('flex');
+
+    tbody.innerHTML = data.map(item => {
+        const tanggalFormatted = item.tanggal ? new Date(item.tanggal + 'T00:00:00').toLocaleDateString('id-ID', {
+            day: 'numeric', month: 'short', year: 'numeric'
+        }) : '-';
+        const totalSantri = (parseInt(item.hadir) || 0) + (parseInt(item.tidakHadir) || 0);
+        const pctHadir = totalSantri > 0 ? Math.round(((parseInt(item.hadir) || 0) / totalSantri) * 100) : 0;
+        const pctColor = pctHadir >= 80 ? 'emerald' : pctHadir >= 50 ? 'amber' : 'rose';
+
+        return `
+        <tr class="hover:bg-surface-50/50 transition-colors">
+            <td class="px-5 py-3.5">
+                <p class="text-sm font-semibold text-surface-800">${tanggalFormatted}</p>
+                <p class="text-[11px] text-surface-400">${escapeHtml(item.jam || '-')} WIB</p>
+            </td>
+            <td class="px-5 py-3.5">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-xs font-bold shadow-sm">
+                        ${(item.guru || '?').charAt(0).toUpperCase()}
+                    </div>
+                    <span class="text-sm font-semibold text-surface-800">${escapeHtml(item.guru || '-')}</span>
+                </div>
+            </td>
+            <td class="px-5 py-3.5">
+                <p class="text-xs font-semibold text-surface-800">${escapeHtml(item.kelas || '-')}</p>
+                <p class="text-[11px] text-primary-600 font-medium">${escapeHtml(item.mapel || '-')}</p>
+            </td>
+            <td class="px-5 py-3.5 max-w-[240px]">
+                <p class="text-xs text-surface-800 truncate font-medium">${escapeHtml(item.materi || '-')}</p>
+                ${item.kegiatan ? `<p class="text-[11px] text-surface-400 truncate mt-0.5">${escapeHtml(item.kegiatan)}</p>` : ''}
+            </td>
+            <td class="px-5 py-3.5 text-center">
+                <div class="inline-flex flex-col items-center gap-0.5">
+                    <span class="text-sm font-bold text-${pctColor}-600">${item.hadir || 0}/${totalSantri}</span>
+                    <div class="w-16 h-1.5 bg-surface-100 rounded-full overflow-hidden">
+                        <div class="h-full bg-${pctColor}-500 rounded-full transition-all" style="width: ${pctHadir}%"></div>
+                    </div>
+                </div>
+            </td>
+            <td class="px-5 py-3.5 text-center">
+                <div class="inline-flex items-center gap-1">
+                    <button onclick="showJurnalDetail('${item.id}')"
+                        class="p-2 rounded-lg hover:bg-primary-50 text-surface-400 hover:text-primary-600 transition-colors" title="Lihat Detail">
+                        <i class="fa-solid fa-eye text-xs"></i>
+                    </button>
+                    <button onclick="openEditJurnalModal('${item.id}')"
+                        class="p-2 rounded-lg hover:bg-amber-50 text-surface-400 hover:text-amber-600 transition-colors" title="Edit">
+                        <i class="fa-solid fa-pen-to-square text-xs"></i>
+                    </button>
+                    <button onclick="confirmDeleteJurnal('${item.id}')"
+                        class="p-2 rounded-lg hover:bg-rose-50 text-surface-400 hover:text-rose-600 transition-colors" title="Hapus">
+                        <i class="fa-solid fa-trash-can text-xs"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function renderJurnalCardList(data) {
+    const container = document.getElementById('jurnal-card-list');
+    if (!container) return;
+
+    if (data.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    container.innerHTML = data.map(item => {
+        const tanggalFormatted = item.tanggal ? new Date(item.tanggal + 'T00:00:00').toLocaleDateString('id-ID', {
+            weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'
+        }) : '-';
+        const totalSantri = (parseInt(item.hadir) || 0) + (parseInt(item.tidakHadir) || 0);
+        const pctHadir = totalSantri > 0 ? Math.round(((parseInt(item.hadir) || 0) / totalSantri) * 100) : 0;
+        const pctColor = pctHadir >= 80 ? 'emerald' : pctHadir >= 50 ? 'amber' : 'rose';
+
+        return `
+        <div class="p-4 hover:bg-surface-50/50 transition-colors cursor-pointer active:bg-surface-100" onclick="showJurnalDetail('${item.id}')">
+            <!-- Header: Guru + Time -->
+            <div class="flex items-start justify-between mb-2.5">
+                <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-xs font-bold shadow-sm shrink-0">
+                        ${(item.guru || '?').charAt(0).toUpperCase()}
+                    </div>
+                    <div class="min-w-0">
+                        <p class="text-sm font-bold text-surface-900 truncate">${escapeHtml(item.guru || '-')}</p>
+                        <p class="text-[10px] text-surface-400">${tanggalFormatted} • ${escapeHtml(item.jam || '-')} WIB</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1 shrink-0 ml-2">
+                    <button onclick="event.stopPropagation(); openEditJurnalModal('${item.id}')"
+                        class="p-1.5 rounded-lg hover:bg-amber-50 text-surface-400 hover:text-amber-600 transition-colors">
+                        <i class="fa-solid fa-pen-to-square text-[11px]"></i>
+                    </button>
+                    <button onclick="event.stopPropagation(); confirmDeleteJurnal('${item.id}')"
+                        class="p-1.5 rounded-lg hover:bg-rose-50 text-surface-400 hover:text-rose-600 transition-colors">
+                        <i class="fa-solid fa-trash-can text-[11px]"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tags: Kelas + Mapel -->
+            <div class="flex flex-wrap items-center gap-1.5 mb-2">
+                <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary-50 text-primary-700 border border-primary-100">
+                    <i class="fa-solid fa-users text-[8px]"></i> ${escapeHtml(item.kelas || '-')}
+                </span>
+                <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
+                    <i class="fa-solid fa-book text-[8px]"></i> ${escapeHtml(item.mapel || '-')}
+                </span>
+            </div>
+
+            <!-- Materi -->
+            <p class="text-xs text-surface-700 leading-relaxed mb-2 line-clamp-2">
+                <i class="fa-solid fa-file-lines text-surface-300 mr-1 text-[10px]"></i>
+                ${escapeHtml(item.materi || '-')}
+            </p>
+
+            <!-- Kehadiran Bar -->
+            <div class="flex items-center justify-between bg-surface-50 rounded-xl px-3 py-2 border border-surface-100">
+                <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-1">
+                        <i class="fa-solid fa-user-check text-[10px] text-emerald-500"></i>
+                        <span class="text-xs font-bold text-emerald-600">${item.hadir || 0}</span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <i class="fa-solid fa-user-xmark text-[10px] text-rose-400"></i>
+                        <span class="text-xs font-bold text-rose-500">${item.tidakHadir || 0}</span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-20 h-1.5 bg-surface-200 rounded-full overflow-hidden">
+                        <div class="h-full bg-${pctColor}-500 rounded-full transition-all" style="width: ${pctHadir}%"></div>
+                    </div>
+                    <span class="text-[11px] font-bold text-${pctColor}-600">${pctHadir}%</span>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function updateJurnalStats() {
+    const todayStr = formatDateISO(new Date());
+
+    // Total jurnal
+    const totalEl = document.getElementById('stat-total-jurnal');
+    if (totalEl) totalEl.textContent = allJurnalData.length;
+
+    // KBM hari ini
+    const hariIniCount = allJurnalData.filter(j => j.tanggal === todayStr).length;
+    const hariIniEl = document.getElementById('stat-jurnal-hari-ini');
+    if (hariIniEl) hariIniEl.textContent = hariIniCount;
+
+    // Guru aktif (unique guru names)
+    const uniqueGuru = new Set(allJurnalData.map(j => (j.guru || '').trim().toLowerCase()).filter(Boolean));
+    const guruEl = document.getElementById('stat-guru-aktif');
+    if (guruEl) guruEl.textContent = uniqueGuru.size;
+
+    // Total santri mengikuti KBM (sum of all hadir)
+    const totalSantriHadir = allJurnalData.reduce((sum, j) => sum + (parseInt(j.hadir) || 0), 0);
+    const santriEl = document.getElementById('stat-santri-kbm');
+    if (santriEl) santriEl.textContent = totalSantriHadir;
+
+    // Badge hari ini di nav
+    const badgeEl = document.getElementById('badge-jurnal-today');
+    if (badgeEl) {
+        if (hariIniCount > 0) {
+            badgeEl.textContent = hariIniCount;
+            badgeEl.classList.remove('hidden');
+        } else {
+            badgeEl.classList.add('hidden');
+        }
+    }
+
+    // Jurnal count in toolbar
+    const countEl = document.getElementById('jurnal-count');
+    if (countEl) countEl.textContent = filteredJurnalData.length;
+}
+
+function resetJurnalFilters() {
+    const searchEl = document.getElementById('search-jurnal');
+    const periodeEl = document.getElementById('filter-jurnal-periode');
+    const tanggalEl = document.getElementById('filter-jurnal-tanggal');
+    const kelasEl = document.getElementById('filter-jurnal-kelas');
+    const mapelEl = document.getElementById('filter-jurnal-mapel');
+
+    if (searchEl) searchEl.value = '';
+    if (periodeEl) periodeEl.value = 'semua';
+    if (tanggalEl) tanggalEl.value = '';
+    if (kelasEl) kelasEl.value = 'semua';
+    if (mapelEl) mapelEl.value = 'semua';
+
+    filterJurnalTable();
+    showToast('Filter jurnal direset.', 'info');
+}
+
+// --- EXPORT & PRINT ---
+
+function exportJurnalToCSV() {
+    if (filteredJurnalData.length === 0) {
+        showToast('Tidak ada data jurnal untuk diexport.', 'info');
+        return;
+    }
+
+    const headers = ['Tanggal', 'Jam', 'Guru Pengajar', 'Kelas', 'Mata Pelajaran', 'Materi Pokok', 'Kegiatan', 'Hadir', 'Tidak Hadir', 'Catatan'];
+    const rows = filteredJurnalData.map(j => [
+        j.tanggal || '',
+        j.jam || '',
+        j.guru || '',
+        j.kelas || '',
+        j.mapel || '',
+        (j.materi || '').replace(/"/g, '""'),
+        (j.kegiatan || '').replace(/"/g, '""'),
+        j.hadir || 0,
+        j.tidakHadir || 0,
+        (j.catatan || '').replace(/"/g, '""')
+    ]);
+
+    const csvContent = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Jurnal_KBM_${formatDateISO(new Date())}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    showToast('Data jurnal berhasil diexport ke CSV!', 'success');
+}
+
+function printJurnalReport() {
+    if (filteredJurnalData.length === 0) {
+        showToast('Tidak ada data jurnal untuk dicetak.', 'info');
+        return;
+    }
+
+    const printRows = filteredJurnalData.map((j, i) => `
+        <tr>
+            <td style="padding:6px 8px;border:1px solid #ddd;font-size:11px;text-align:center">${i + 1}</td>
+            <td style="padding:6px 8px;border:1px solid #ddd;font-size:11px">${j.tanggal || '-'}<br><small>${j.jam || ''} WIB</small></td>
+            <td style="padding:6px 8px;border:1px solid #ddd;font-size:11px;font-weight:600">${escapeHtml(j.guru || '-')}</td>
+            <td style="padding:6px 8px;border:1px solid #ddd;font-size:11px">${escapeHtml(j.kelas || '-')}</td>
+            <td style="padding:6px 8px;border:1px solid #ddd;font-size:11px">${escapeHtml(j.mapel || '-')}</td>
+            <td style="padding:6px 8px;border:1px solid #ddd;font-size:11px">${escapeHtml(j.materi || '-')}</td>
+            <td style="padding:6px 8px;border:1px solid #ddd;font-size:11px;text-align:center">${j.hadir || 0}</td>
+            <td style="padding:6px 8px;border:1px solid #ddd;font-size:11px;text-align:center">${j.tidakHadir || 0}</td>
+        </tr>
+    `).join('');
+
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <html>
+        <head>
+            <title>Rekap Jurnal KBM</title>
+            <style>
+                body { font-family: 'Segoe UI', sans-serif; padding: 20px; color: #333; }
+                h2 { text-align: center; margin-bottom: 4px; }
+                p.sub { text-align: center; color: #666; font-size: 12px; margin-bottom: 20px; }
+                table { width: 100%; border-collapse: collapse; }
+                th { background: #4f46e5; color: #fff; padding: 8px; font-size: 11px; text-align: left; border: 1px solid #4338ca; }
+                @media print { body { padding: 0; } }
+            </style>
+        </head>
+        <body>
+            <h2>Rekap Jurnal Kegiatan Belajar Mengajar (KBM)</h2>
+            <p class="sub">Dicetak pada: ${new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} — Total: ${filteredJurnalData.length} data</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>No</th><th>Tanggal</th><th>Guru</th><th>Kelas</th><th>Mapel</th><th>Materi</th><th>Hadir</th><th>Absen</th>
+                    </tr>
+                </thead>
+                <tbody>${printRows}</tbody>
+            </table>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+    setTimeout(() => printWindow.print(), 500);
+    showToast('Halaman cetak rekap jurnal dibuka!', 'info');
+}
+
+// --- INIT on DOMContentLoaded (hook into existing init) ---
+// We need to call initJurnalModule after firebase connects
+// Hook into connectToFirebase completion
+const _originalConnectToFirebase = connectToFirebase;
+connectToFirebase = async function() {
+    await _originalConnectToFirebase();
+    initJurnalModule();
+};
+
+// Also load jurnal data immediately from localStorage
+loadJurnalFromLocalStorage();

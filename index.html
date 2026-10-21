@@ -189,6 +189,16 @@
                     <span>Data Caberawit</span>
                 </a>
 
+                <a href="#" id="nav-jurnal" onclick="navigateTo('jurnal')"
+                    class="nav-link group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200">
+                    <div
+                        class="nav-icon-wrap w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200">
+                        <i class="fa-solid fa-book-open-reader text-[15px]"></i>
+                    </div>
+                    <span>Jurnal Guru & KBM</span>
+                    <span id="badge-jurnal-today" class="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary-100 text-primary-700 hidden">0</span>
+                </a>
+
                 <div class="pt-4">
                     <p class="text-[10px] font-bold text-surface-400 uppercase tracking-widest px-3 mb-3">Lainnya</p>
                 </div>
@@ -299,11 +309,11 @@
                                     <p id="stat-hadir" class="text-3xl font-extrabold text-surface-900 tabular-nums">0
                                     </p>
                                     <div class="flex items-center gap-1.5 mt-2">
-                                        <span
+                                        <!-- <span
                                             class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-600 text-[11px] font-semibold">
                                             <i class="fa-solid fa-arrow-up text-[9px]"></i> 12%
                                         </span>
-                                        <span class="text-[11px] text-surface-400">vs kemarin</span>
+                                        <span class="text-[11px] text-surface-400">vs kemarin</span> -->
                                     </div>
                                 </div>
                                 <div
@@ -326,11 +336,11 @@
                                     <p id="stat-izin" class="text-3xl font-extrabold text-surface-900 tabular-nums">0
                                     </p>
                                     <div class="flex items-center gap-1.5 mt-2">
-                                        <span
+                                        <!-- <span
                                             class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-600 text-[11px] font-semibold">
                                             <i class="fa-solid fa-minus text-[9px]"></i> 0%
                                         </span>
-                                        <span class="text-[11px] text-surface-400">vs kemarin</span>
+                                        <span class="text-[11px] text-surface-400">vs kemarin</span> -->
                                     </div>
                                 </div>
                                 <div
@@ -353,11 +363,11 @@
                                     <p id="stat-sakit" class="text-3xl font-extrabold text-surface-900 tabular-nums">0
                                     </p>
                                     <div class="flex items-center gap-1.5 mt-2">
-                                        <span
+                                        <!-- <span
                                             class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-sky-50 text-sky-600 text-[11px] font-semibold">
                                             <i class="fa-solid fa-arrow-down text-[9px]"></i> 5%
                                         </span>
-                                        <span class="text-[11px] text-surface-400">vs kemarin</span>
+                                        <span class="text-[11px] text-surface-400">vs kemarin</span> -->
                                     </div>
                                 </div>
                                 <div
@@ -380,11 +390,11 @@
                                     <p id="stat-alpa" class="text-3xl font-extrabold text-surface-900 tabular-nums">0
                                     </p>
                                     <div class="flex items-center gap-1.5 mt-2">
-                                        <span
+                                        <!-- <span
                                             class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-600 text-[11px] font-semibold">
                                             <i class="fa-solid fa-arrow-up text-[9px]"></i> 3%
                                         </span>
-                                        <span class="text-[11px] text-surface-400">vs kemarin</span>
+                                        <span class="text-[11px] text-surface-400">vs kemarin</span> -->
                                     </div>
                                 </div>
                                 <div
@@ -948,7 +958,7 @@
                                 <button onclick="showAddKaryawanModal()"
                                     class="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-primary-500/25 hover:shadow-xl hover:from-primary-700 hover:to-primary-800 active:scale-[0.98] transition-all duration-200 whitespace-nowrap">
                                     <i class="fa-solid fa-plus text-xs"></i>
-                                    Tambah Karyawan
+                                    Tambah Caberawit
                                 </button>
                             </div>
                         </div>
@@ -1014,6 +1024,199 @@
                             </div>
                             <p class="text-sm font-semibold text-surface-500">Belum ada karyawan</p>
                             <p class="text-xs text-surface-400 mt-1">Klik tombol "Tambah Karyawan" untuk memulai.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ============================
+                 SECTION: JURNAL GURU & KBM
+                 ============================ -->
+                <section id="section-jurnal" class="page-section hidden">
+                    <!-- Stat Cards Grid -->
+                    <div class="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-5 mb-6">
+                        <!-- Card: Total Jurnal -->
+                        <div class="stat-card group relative overflow-hidden bg-white rounded-2xl border border-surface-200/60 p-4 sm:p-5 shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-1 cursor-default animate-slide-up">
+                            <div class="absolute top-0 right-0 w-24 h-24 bg-primary-500/5 rounded-full -translate-y-8 translate-x-8 group-hover:scale-150 transition-transform duration-500"></div>
+                            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between relative gap-2">
+                                <div class="order-2 sm:order-1">
+                                    <p class="text-[10px] sm:text-xs font-semibold text-surface-400 uppercase tracking-wider mb-0.5 sm:mb-1">Total Jurnal</p>
+                                    <p id="stat-total-jurnal" class="text-2xl sm:text-3xl font-extrabold text-surface-900 tabular-nums">0</p>
+                                    <p class="text-[10px] sm:text-[11px] text-surface-400 mt-0.5 sm:mt-1 hidden sm:block">Seluruh sesi pembelajaran</p>
+                                </div>
+                                <div class="order-1 sm:order-2 w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-lg shadow-primary-500/20 text-white text-sm sm:text-lg">
+                                    <i class="fa-solid fa-book-bookmark"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card: KBM Hari Ini -->
+                        <div class="stat-card group relative overflow-hidden bg-white rounded-2xl border border-surface-200/60 p-4 sm:p-5 shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-1 cursor-default animate-slide-up" style="animation-delay: 0.05s">
+                            <div class="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -translate-y-8 translate-x-8 group-hover:scale-150 transition-transform duration-500"></div>
+                            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between relative gap-2">
+                                <div class="order-2 sm:order-1">
+                                    <p class="text-[10px] sm:text-xs font-semibold text-surface-400 uppercase tracking-wider mb-0.5 sm:mb-1">KBM Hari Ini</p>
+                                    <p id="stat-jurnal-hari-ini" class="text-2xl sm:text-3xl font-extrabold text-emerald-600 tabular-nums">0</p>
+                                    <p class="text-[10px] sm:text-[11px] text-emerald-600/80 mt-0.5 sm:mt-1 hidden sm:block">Terlaksana hari ini</p>
+                                </div>
+                                <div class="order-1 sm:order-2 w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-white text-sm sm:text-lg">
+                                    <i class="fa-solid fa-calendar-check"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card: Guru Aktif -->
+                        <div class="stat-card group relative overflow-hidden bg-white rounded-2xl border border-surface-200/60 p-4 sm:p-5 shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-1 cursor-default animate-slide-up" style="animation-delay: 0.1s">
+                            <div class="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full -translate-y-8 translate-x-8 group-hover:scale-150 transition-transform duration-500"></div>
+                            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between relative gap-2">
+                                <div class="order-2 sm:order-1">
+                                    <p class="text-[10px] sm:text-xs font-semibold text-surface-400 uppercase tracking-wider mb-0.5 sm:mb-1">Guru Aktif</p>
+                                    <p id="stat-guru-aktif" class="text-2xl sm:text-3xl font-extrabold text-amber-600 tabular-nums">0</p>
+                                    <p class="text-[10px] sm:text-[11px] text-surface-400 mt-0.5 sm:mt-1 hidden sm:block">Tenaga pendidik</p>
+                                </div>
+                                <div class="order-1 sm:order-2 w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center shadow-lg shadow-amber-500/20 text-white text-sm sm:text-lg">
+                                    <i class="fa-solid fa-chalkboard-user"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card: Santri Mengikuti KBM -->
+                        <div class="stat-card group relative overflow-hidden bg-white rounded-2xl border border-surface-200/60 p-4 sm:p-5 shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-1 cursor-default animate-slide-up" style="animation-delay: 0.15s">
+                            <div class="absolute top-0 right-0 w-24 h-24 bg-purple-500/5 rounded-full -translate-y-8 translate-x-8 group-hover:scale-150 transition-transform duration-500"></div>
+                            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between relative gap-2">
+                                <div class="order-2 sm:order-1">
+                                    <p class="text-[10px] sm:text-xs font-semibold text-surface-400 uppercase tracking-wider mb-0.5 sm:mb-1">Santri KBM</p>
+                                    <p id="stat-santri-kbm" class="text-2xl sm:text-3xl font-extrabold text-purple-600 tabular-nums">0</p>
+                                    <p class="text-[10px] sm:text-[11px] text-surface-400 mt-0.5 sm:mt-1 hidden sm:block">Total kehadiran santri</p>
+                                </div>
+                                <div class="order-1 sm:order-2 w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-lg shadow-purple-500/20 text-white text-sm sm:text-lg">
+                                    <i class="fa-solid fa-graduation-cap"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Main Journal Container -->
+                    <div class="bg-white rounded-2xl border border-surface-200/60 shadow-card overflow-hidden animate-slide-up">
+                        <!-- Top Toolbar -->
+                        <div class="flex flex-col gap-4 p-4 sm:p-6 border-b border-surface-100">
+                            <div class="flex items-start justify-between">
+                                <div>
+                                    <h3 class="text-sm sm:text-lg font-bold text-surface-900 flex items-center gap-2">
+                                        <span>Jurnal KBM</span>
+                                        <span class="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-primary-50 text-primary-600 border border-primary-200/60">
+                                            <span id="jurnal-count">0</span> Data
+                                        </span>
+                                    </h3>
+                                    <p class="text-[10px] sm:text-xs text-surface-400 mt-0.5">Catatan aktivitas harian guru & materi pembelajaran</p>
+                                </div>
+                                <button onclick="openAddJurnalModal()"
+                                    class="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white text-[11px] sm:text-sm font-semibold rounded-xl shadow-lg shadow-primary-500/25 active:scale-[0.98] transition-all whitespace-nowrap">
+                                    <i class="fa-solid fa-plus text-[10px] sm:text-xs"></i>
+                                    <span class="hidden sm:inline">Catat Jurnal Baru</span>
+                                    <span class="sm:hidden">Tambah</span>
+                                </button>
+                            </div>
+
+                            <!-- Search & Action Buttons Row -->
+                            <div class="flex flex-wrap items-center gap-2">
+                                <div class="relative flex-1 min-w-[140px]">
+                                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 text-[10px] sm:text-xs"></i>
+                                    <input id="search-jurnal" type="text" placeholder="Cari guru, materi..."
+                                        oninput="filterJurnalTable()"
+                                        class="text-[11px] sm:text-sm bg-surface-50 border border-surface-200 rounded-xl pl-8 sm:pl-9 pr-3 py-2 sm:py-2.5 w-full focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all placeholder:text-surface-400" />
+                                </div>
+                                <button onclick="exportJurnalToCSV()"
+                                    class="inline-flex items-center gap-1.5 px-3 py-2 sm:py-2.5 bg-surface-100 hover:bg-surface-200 text-surface-700 text-[11px] sm:text-xs font-semibold rounded-xl transition-all border border-surface-200/80 active:scale-95"
+                                    title="Export Excel">
+                                    <i class="fa-solid fa-file-excel text-emerald-600 text-xs"></i>
+                                    <span class="hidden sm:inline">Export</span>
+                                </button>
+                                <button onclick="printJurnalReport()"
+                                    class="inline-flex items-center gap-1.5 px-3 py-2 sm:py-2.5 bg-surface-100 hover:bg-surface-200 text-surface-700 text-[11px] sm:text-xs font-semibold rounded-xl transition-all border border-surface-200/80 active:scale-95"
+                                    title="Cetak Rekap">
+                                    <i class="fa-solid fa-print text-surface-600 text-xs"></i>
+                                    <span class="hidden sm:inline">Cetak</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Filter Bar (Scrollable on mobile) -->
+                        <div class="px-4 sm:px-6 py-3 bg-surface-50/70 border-b border-surface-100 overflow-x-auto custom-scrollbar">
+                            <div class="flex items-center gap-2 sm:gap-3 text-xs min-w-max">
+                                <span class="font-bold text-surface-500 uppercase tracking-wider text-[10px] mr-1">
+                                    <i class="fa-solid fa-filter mr-0.5 text-primary-500"></i>Filter:
+                                </span>
+                                <select id="filter-jurnal-periode" onchange="filterJurnalTable()"
+                                    class="bg-white border border-surface-200 rounded-lg px-2 py-1.5 text-surface-700 focus:ring-1 focus:ring-primary-500 font-medium text-[11px] sm:text-xs">
+                                    <option value="semua">Semua Periode</option>
+                                    <option value="hari-ini">Hari Ini</option>
+                                    <option value="minggu-ini">Minggu Ini</option>
+                                    <option value="bulan-ini">Bulan Ini</option>
+                                </select>
+                                <input type="date" id="filter-jurnal-tanggal" onchange="filterJurnalTable()"
+                                    class="bg-white border border-surface-200 rounded-lg px-2 py-1.5 text-surface-700 focus:ring-1 focus:ring-primary-500 font-medium text-[11px] sm:text-xs" />
+                                <select id="filter-jurnal-kelas" onchange="filterJurnalTable()"
+                                    class="bg-white border border-surface-200 rounded-lg px-2 py-1.5 text-surface-700 focus:ring-1 focus:ring-primary-500 font-medium text-[11px] sm:text-xs">
+                                    <option value="semua">Semua Kelas</option>
+                                    <option value="Caberawit PAUD/TK">Caberawit PAUD/TK</option>
+                                    <option value="Caberawit Ula (SD 1-3)">Caberawit Ula (SD 1-3)</option>
+                                    <option value="Caberawit Wustho (SD 4-6)">Caberawit Wustho (SD 4-6)</option>
+                                    <option value="Pra-Remaja (SMP)">Pra-Remaja (SMP)</option>
+                                    <option value="Remaja (SMA/Kuliah)">Remaja (SMA/Kuliah)</option>
+                                </select>
+                                <select id="filter-jurnal-mapel" onchange="filterJurnalTable()"
+                                    class="bg-white border border-surface-200 rounded-lg px-2 py-1.5 text-surface-700 focus:ring-1 focus:ring-primary-500 font-medium text-[11px] sm:text-xs">
+                                    <option value="semua">Semua Mapel</option>
+                                    <option value="Al-Qur'an & Tilawati">Al-Qur'an & Tilawati</option>
+                                    <option value="Hadist Himpunan">Hadist Himpunan</option>
+                                    <option value="Pegon / Makna Gandul">Pegon / Makna Gandul</option>
+                                    <option value="Praktik Ibadah & Sholat">Praktik Ibadah & Sholat</option>
+                                    <option value="Hafalan Doa & Asmaul Husna">Hafalan Doa & Asmaul Husna</option>
+                                    <option value="Akhlak & Tata Krama">Akhlak & Tata Krama</option>
+                                    <option value="Lainnya">Lainnya</option>
+                                </select>
+                                <button onclick="resetJurnalFilters()"
+                                    class="text-surface-500 hover:text-rose-600 transition-colors font-medium text-[11px] flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-rose-50 whitespace-nowrap">
+                                    <i class="fa-solid fa-rotate-left text-[10px]"></i> Reset
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Desktop Table (hidden on mobile) -->
+                        <div class="hidden md:block overflow-x-auto">
+                            <table class="w-full text-left border-collapse min-w-[800px]">
+                                <thead>
+                                    <tr class="border-b border-surface-100 bg-surface-50/50">
+                                        <th class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-5 py-3.5">Tanggal & Waktu</th>
+                                        <th class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-5 py-3.5">Guru Pengajar</th>
+                                        <th class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-5 py-3.5">Kelas & Mapel</th>
+                                        <th class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-5 py-3.5">Materi & Kegiatan</th>
+                                        <th class="text-center text-[11px] font-bold text-surface-400 uppercase tracking-wider px-5 py-3.5">Kehadiran</th>
+                                        <th class="text-center text-[11px] font-bold text-surface-400 uppercase tracking-wider px-5 py-3.5">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="jurnal-table-body" class="divide-y divide-surface-100 text-sm">
+                                    <!-- Rendered dynamically by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Mobile Card List (hidden on desktop) -->
+                        <div id="jurnal-card-list" class="md:hidden divide-y divide-surface-100">
+                            <!-- Rendered dynamically by JavaScript as mobile cards -->
+                        </div>
+
+                        <!-- Empty State -->
+                        <div id="jurnal-empty" class="hidden flex-col items-center justify-center py-12 sm:py-16 px-4 text-center">
+                            <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-primary-50 flex items-center justify-center mb-3 sm:mb-4 text-primary-500">
+                                <i class="fa-solid fa-book-open-reader text-2xl sm:text-3xl"></i>
+                            </div>
+                            <h4 class="text-sm sm:text-base font-bold text-surface-800">Belum Ada Catatan Jurnal KBM</h4>
+                            <p class="text-[11px] sm:text-xs text-surface-400 max-w-sm mt-1 mb-4 sm:mb-5">Mulai catat materi, aktivitas pembelajaran guru, dan rekap absensi kelas hari ini.</p>
+                            <button onclick="openAddJurnalModal()"
+                                class="inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 text-white text-xs font-semibold rounded-xl shadow-lg shadow-primary-500/25 hover:from-primary-700 hover:to-primary-800 transition-all">
+                                <i class="fa-solid fa-plus"></i> Catat Jurnal Pertama
+                            </button>
                         </div>
                     </div>
                 </section>
@@ -1487,6 +1690,206 @@ Storage    : absensi-4d9c8.firebasestorage.app</code></pre>
         </div>
     </div>
 
+
+
+    <!-- ============================================================
+         MODAL: Tambah / Edit Jurnal KBM
+         ============================================================ -->
+    <div id="modal-jurnal" class="fixed inset-0 z-50 hidden items-end sm:items-center justify-center sm:p-4">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeModal('modal-jurnal')"></div>
+        <div class="relative bg-white w-full sm:rounded-2xl sm:max-w-lg shadow-2xl animate-slide-up max-h-[92vh] sm:max-h-[85vh] flex flex-col rounded-t-3xl sm:rounded-t-2xl">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between px-5 sm:px-6 pt-5 sm:pt-6 pb-3 border-b border-surface-100 shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-white shadow-md">
+                        <i class="fa-solid fa-book-open-reader text-sm"></i>
+                    </div>
+                    <div>
+                        <h3 id="jurnal-modal-title" class="text-base sm:text-lg font-bold text-surface-900">Catat Jurnal KBM</h3>
+                        <p class="text-[10px] sm:text-xs text-surface-400">Isi data kegiatan belajar mengajar</p>
+                    </div>
+                </div>
+                <button onclick="closeModal('modal-jurnal')"
+                    class="p-2 rounded-xl hover:bg-surface-100 text-surface-400 transition-colors">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body (Scrollable) -->
+            <div class="overflow-y-auto flex-1 custom-scrollbar">
+                <form id="jurnal-form" onsubmit="handleSubmitJurnal(event)" class="p-5 sm:p-6 space-y-4">
+                    <input type="hidden" id="jurnal-edit-id" />
+
+                    <!-- Row: Guru Pengajar -->
+                    <div>
+                        <label class="block text-xs sm:text-sm font-semibold text-surface-700 mb-1.5">
+                            <i class="fa-solid fa-chalkboard-user text-primary-500 mr-1 text-[10px]"></i>
+                            Nama Guru / Ustadz <span class="text-rose-500">*</span>
+                        </label>
+                        <input type="text" id="jurnal-guru" required placeholder="Contoh: Ustadz Ahmad Fauzi"
+                            class="w-full px-3.5 py-2.5 sm:py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all placeholder:text-surface-400" />
+                    </div>
+
+                    <!-- Row: Tanggal & Jam -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs sm:text-sm font-semibold text-surface-700 mb-1.5">
+                                <i class="fa-solid fa-calendar text-primary-500 mr-1 text-[10px]"></i>
+                                Tanggal <span class="text-rose-500">*</span>
+                            </label>
+                            <input type="date" id="jurnal-tanggal" required
+                                class="w-full px-3 py-2.5 sm:py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all" />
+                        </div>
+                        <div>
+                            <label class="block text-xs sm:text-sm font-semibold text-surface-700 mb-1.5">
+                                <i class="fa-solid fa-clock text-primary-500 mr-1 text-[10px]"></i>
+                                Jam KBM <span class="text-rose-500">*</span>
+                            </label>
+                            <input type="time" id="jurnal-jam" required
+                                class="w-full px-3 py-2.5 sm:py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all" />
+                        </div>
+                    </div>
+
+                    <!-- Row: Kelas & Mapel -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs sm:text-sm font-semibold text-surface-700 mb-1.5">
+                                <i class="fa-solid fa-users text-primary-500 mr-1 text-[10px]"></i>
+                                Kelas / Kelompok <span class="text-rose-500">*</span>
+                            </label>
+                            <select id="jurnal-kelas" required
+                                class="w-full px-3 py-2.5 sm:py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all">
+                                <option value="">— Pilih Kelas —</option>
+                                <option value="Caberawit PAUD/TK">Caberawit PAUD/TK</option>
+                                <option value="Caberawit Ula (SD 1-3)">Caberawit Ula (SD 1-3)</option>
+                                <option value="Caberawit Wustho (SD 4-6)">Caberawit Wustho (SD 4-6)</option>
+                                <option value="Pra-Remaja (SMP)">Pra-Remaja (SMP)</option>
+                                <option value="Remaja (SMA/Kuliah)">Remaja (SMA/Kuliah)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs sm:text-sm font-semibold text-surface-700 mb-1.5">
+                                <i class="fa-solid fa-book text-primary-500 mr-1 text-[10px]"></i>
+                                Mata Pelajaran <span class="text-rose-500">*</span>
+                            </label>
+                            <select id="jurnal-mapel" required
+                                class="w-full px-3 py-2.5 sm:py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all">
+                                <option value="">— Pilih Mapel —</option>
+                                <option value="Al-Qur'an & Tilawati">Al-Qur'an & Tilawati</option>
+                                <option value="Hadist Himpunan">Hadist Himpunan</option>
+                                <option value="Pegon / Makna Gandul">Pegon / Makna Gandul</option>
+                                <option value="Praktik Ibadah & Sholat">Praktik Ibadah & Sholat</option>
+                                <option value="Hafalan Doa & Asmaul Husna">Hafalan Doa & Asmaul Husna</option>
+                                <option value="Akhlak & Tata Krama">Akhlak & Tata Krama</option>
+                                <option value="Lainnya">Lainnya</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Row: Materi Pokok -->
+                    <div>
+                        <label class="block text-xs sm:text-sm font-semibold text-surface-700 mb-1.5">
+                            <i class="fa-solid fa-file-lines text-primary-500 mr-1 text-[10px]"></i>
+                            Materi Pokok / Topik <span class="text-rose-500">*</span>
+                        </label>
+                        <input type="text" id="jurnal-materi" required placeholder="Contoh: Surat Al-Fatihah ayat 1-4, Tajwid Nun Mati"
+                            class="w-full px-3.5 py-2.5 sm:py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all placeholder:text-surface-400" />
+                    </div>
+
+                    <!-- Row: Deskripsi Kegiatan -->
+                    <div>
+                        <label class="block text-xs sm:text-sm font-semibold text-surface-700 mb-1.5">
+                            <i class="fa-solid fa-pen-clip text-primary-500 mr-1 text-[10px]"></i>
+                            Deskripsi Kegiatan
+                        </label>
+                        <textarea id="jurnal-kegiatan" rows="2" placeholder="Contoh: Membaca bersama, hafalan bergiliran, diskusi kelompok..."
+                            class="w-full px-3.5 py-2.5 sm:py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all placeholder:text-surface-400 resize-none"></textarea>
+                    </div>
+
+                    <!-- Row: Jumlah Kehadiran -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs sm:text-sm font-semibold text-surface-700 mb-1.5">
+                                <i class="fa-solid fa-user-check text-emerald-500 mr-1 text-[10px]"></i>
+                                Jumlah Hadir
+                            </label>
+                            <input type="number" id="jurnal-hadir" min="0" placeholder="0"
+                                class="w-full px-3.5 py-2.5 sm:py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all placeholder:text-surface-400" />
+                        </div>
+                        <div>
+                            <label class="block text-xs sm:text-sm font-semibold text-surface-700 mb-1.5">
+                                <i class="fa-solid fa-user-xmark text-rose-500 mr-1 text-[10px]"></i>
+                                Jumlah Tidak Hadir
+                            </label>
+                            <input type="number" id="jurnal-tidak-hadir" min="0" placeholder="0"
+                                class="w-full px-3.5 py-2.5 sm:py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all placeholder:text-surface-400" />
+                        </div>
+                    </div>
+
+                    <!-- Row: Catatan Evaluasi -->
+                    <div>
+                        <label class="block text-xs sm:text-sm font-semibold text-surface-700 mb-1.5">
+                            <i class="fa-solid fa-clipboard-check text-amber-500 mr-1 text-[10px]"></i>
+                            Catatan / Evaluasi (Opsional)
+                        </label>
+                        <textarea id="jurnal-catatan" rows="2" placeholder="Catatan: anak-anak sudah lancar baca, perlu pengulangan tajwid..."
+                            class="w-full px-3.5 py-2.5 sm:py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all placeholder:text-surface-400 resize-none"></textarea>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button type="submit" id="jurnal-submit-btn"
+                        class="w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-600 to-primary-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-primary-500/25 hover:from-primary-700 hover:to-primary-800 active:scale-[0.98] transition-all duration-200">
+                        <i class="fa-solid fa-check text-xs"></i> <span id="jurnal-submit-text">Simpan Jurnal KBM</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================
+         MODAL: Detail Jurnal (View Only - Mobile friendly)
+         ============================================================ -->
+    <div id="modal-jurnal-detail" class="fixed inset-0 z-50 hidden items-end sm:items-center justify-center sm:p-4">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeModal('modal-jurnal-detail')"></div>
+        <div class="relative bg-white w-full sm:rounded-2xl sm:max-w-md shadow-2xl animate-slide-up max-h-[85vh] flex flex-col rounded-t-3xl sm:rounded-t-2xl">
+            <div class="flex items-center justify-between px-5 pt-5 pb-3 border-b border-surface-100 shrink-0">
+                <h3 class="text-base font-bold text-surface-900 flex items-center gap-2">
+                    <i class="fa-solid fa-book-open text-primary-500"></i> Detail Jurnal
+                </h3>
+                <button onclick="closeModal('modal-jurnal-detail')"
+                    class="p-2 rounded-xl hover:bg-surface-100 text-surface-400 transition-colors">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div id="jurnal-detail-content" class="overflow-y-auto flex-1 custom-scrollbar p-5 space-y-3">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================
+         MODAL: Konfirmasi Hapus Jurnal
+         ============================================================ -->
+    <div id="modal-delete-jurnal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeModal('modal-delete-jurnal')"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 animate-slide-up text-center">
+            <div class="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-4 border border-rose-100 shadow-sm">
+                <i class="fa-solid fa-trash-can text-xl"></i>
+            </div>
+            <h3 class="text-lg font-bold text-surface-900 mb-1.5">Hapus Jurnal?</h3>
+            <p class="text-xs text-surface-500 mb-6 leading-relaxed">Data jurnal KBM ini akan dihapus permanen dan tidak dapat dikembalikan.</p>
+            <div class="flex items-center gap-2.5">
+                <button type="button" onclick="closeModal('modal-delete-jurnal')"
+                    class="flex-1 px-4 py-2.5 bg-surface-100 hover:bg-surface-200 text-surface-700 text-xs font-semibold rounded-xl transition-all">
+                    Batal
+                </button>
+                <button type="button" id="btn-confirm-delete-jurnal" onclick="executeDeleteJurnal()"
+                    class="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl shadow-lg shadow-rose-500/25 active:scale-95 transition-all">
+                    <i class="fa-solid fa-trash-can text-xs"></i> Ya, Hapus
+                </button>
+            </div>
+        </div>
+    </div>
 
 
     <!-- ============================================================

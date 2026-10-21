@@ -179,14 +179,26 @@
    ----------------------------------------------- */
 #attendance-table-body tr,
 #rekap-table-body tr,
-#karyawan-table-body tr {
+#karyawan-table-body tr,
+#jurnal-table-body tr {
     transition: background-color 0.15s ease;
 }
 
 #attendance-table-body tr:hover,
 #rekap-table-body tr:hover,
-#karyawan-table-body tr:hover {
+#karyawan-table-body tr:hover,
+#jurnal-table-body tr:hover {
     background-color: #f8fafc;
+}
+
+/* -----------------------------------------------
+   Mobile Card Line Clamp (Jurnal)
+   ----------------------------------------------- */
+.line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 /* -----------------------------------------------
