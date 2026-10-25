@@ -294,6 +294,7 @@ function setupRealtimeDbListeners() {
         renderKaryawanTable(allKaryawanData);
         updateKaryawanDatalist();
         updateQuickQRCaberawitSelect();
+        if (typeof populateRaportMuridSelect === 'function') populateRaportMuridSelect();
     });
 }
 
@@ -362,6 +363,7 @@ function setupFirestoreListeners() {
         renderKaryawanTable(allKaryawanData);
         updateKaryawanDatalist();
         updateQuickQRCaberawitSelect();
+        if (typeof populateRaportMuridSelect === 'function') populateRaportMuridSelect();
     });
 }
 
@@ -409,6 +411,7 @@ function loadFromLocalStorage() {
         updateKaryawanDatalist();
         updateQuickQRCaberawitSelect();
         renderRecentScansFeed();
+        if (typeof populateRaportMuridSelect === 'function') populateRaportMuridSelect();
     } catch (e) {}
 }
 
@@ -421,6 +424,7 @@ function ensureDataAvailable() {
     updateKaryawanDatalist();
     updateQuickQRCaberawitSelect();
     renderRecentScansFeed();
+    if (typeof populateRaportMuridSelect === 'function') populateRaportMuridSelect();
 }
 
 
@@ -515,22 +519,27 @@ async function clearAllData() {
 
     allAbsensiData = [];
     allKaryawanData = [];
+    allRaportData = [];
     selectedKaryawanIds.clear();
     selectedRekapIds.clear();
     localStorage.removeItem('absensiku_absensi');
     localStorage.removeItem('absensiku_karyawan');
+    localStorage.removeItem('absensiku_raport');
     localStorage.removeItem('absensiku_seeded');
 
     if (isFirebaseConnected) {
         if (activeEngine === 'rtdb' && rtdb) {
             rtdb.ref('absensi').remove().catch(() => {});
             rtdb.ref('karyawan').remove().catch(() => {});
+            rtdb.ref('raport').remove().catch(() => {});
         } else if (activeEngine === 'firestore' && db) {
             try {
                 const absSnap = await db.collection('absensi').get();
                 absSnap.forEach(d => d.ref.delete());
                 const karSnap = await db.collection('karyawan').get();
                 karSnap.forEach(d => d.ref.delete());
+                const rapSnap = await db.collection('raport').get();
+                rapSnap.forEach(d => d.ref.delete());
             } catch (e) {}
         }
     }
@@ -545,6 +554,7 @@ async function clearAllData() {
     if (currentPage === 'rekap') filterRekapData();
     updateKaryawanBulkUI();
     updateRekapBulkUI();
+    if (typeof renderRaportData === 'function') renderRaportData();
 
     showToast('Seluruh data berhasil dikosongkan.', 'info');
 }
@@ -1676,6 +1686,7 @@ function navigateTo(page) {
         rekap: { title: 'Rekap Data', subtitle: 'Filter dan kelola data absensi' },
         karyawan: { title: 'Data Caberawit', subtitle: 'Kelola data peserta caberawit terdaftar' },
         jurnal: { title: 'Jurnal Guru & KBM', subtitle: 'Catatan kegiatan belajar mengajar harian' },
+        raport: { title: 'Raport Caberawit', subtitle: 'Evaluasi kekurangan materi & perkembangan murid untuk orang tua' },
         pengaturan: { title: 'Pengaturan', subtitle: 'Konfigurasi sistem & database absensi' }
     };
 
@@ -1691,6 +1702,9 @@ function navigateTo(page) {
         renderKaryawanTable(allKaryawanData);
     } else if (page === 'jurnal') {
         renderJurnalData();
+    } else if (page === 'raport') {
+        renderRaportData();
+        populateRaportMuridSelect();
     }
 
     const sidebar = document.getElementById('sidebar');
@@ -3214,14 +3228,820 @@ function printJurnalReport() {
     showToast('Halaman cetak rekap jurnal dibuka!', 'info');
 }
 
-// --- INIT on DOMContentLoaded (hook into existing init) ---
-// We need to call initJurnalModule after firebase connects
-// Hook into connectToFirebase completion
+// -----------------------------------------------
+// 21. RAPORT CABERAWIT — EVALUASI KEKURANGAN MATERI
+// -----------------------------------------------
+
+let allRaportData = [];
+let filteredRaportData = [];
+let pendingDeleteRaportId = null;
+
+// --- INITIALIZATION & DATA PERSISTENCE ---
+
+function initRaportModule() {
+    loadRaportFromLocalStorage();
+    if (activeEngine === 'rtdb' && rtdb) {
+        setupRaportRtdbListener();
+    } else if (activeEngine === 'firestore' && db) {
+        setupRaportFirestoreListener();
+    }
+    populateRaportMuridSelect();
+    renderRaportData();
+}
+
+function loadRaportFromLocalStorage() {
+    try {
+        const stored = localStorage.getItem('absensiku_raport');
+        if (stored) {
+            allRaportData = JSON.parse(stored);
+        } else {
+            // Data awal contoh jika belum ada
+            allRaportData = [
+                {
+                    id: 'raport-demo-1',
+                    nama: 'Ahmad Faiz',
+                    kelas: 'Caberawit Ula (SD 1-3)',
+                    periode: '2026-10',
+                    mapel: "Al-Qur'an & Tilawati",
+                    kekurangan: "Makharijul huruf sin (س) dan syin (ش) masih sering tertukar. Panjang mad thabi'i pada akhir ayat masih kurang konsisten.",
+                    saran: "Mohon didampingi mengulang Tilawati jilid 2 halaman 15-20 sebanyak 10 menit setiap ba'da Maghrib.",
+                    predikat: 'Baik',
+                    status: 'Dikirim',
+                    catatan: 'Anak sangat antusias dan rajin masuk kelas.',
+                    timestamp: Date.now() - 86400000 * 2
+                },
+                {
+                    id: 'raport-demo-2',
+                    nama: 'Fathimah Azzahra',
+                    kelas: 'Caberawit PAUD/TK',
+                    periode: '2026-10',
+                    mapel: 'Hafalan Doa & Asmaul Husna',
+                    kekurangan: 'Doa sebelum tidur lancar, namun doa bangun tidur dan doa masuk kamar mandi masih perlu pengulangan lafadz.',
+                    saran: 'Mohon dibiasakan membaca doa sehari-hari bersama orang tua sebelum dan sesudah beraktivitas.',
+                    predikat: 'Perlu Bimbingan',
+                    status: 'Dikirim',
+                    catatan: 'Daya ingat bagus, butuh dibiasakan dalam rutinitas harian di rumah.',
+                    timestamp: Date.now() - 86400000 * 4
+                }
+            ];
+            saveRaportToLocalStorage();
+        }
+        filteredRaportData = [...allRaportData];
+        renderRaportData();
+    } catch (e) {
+        console.warn('Error loading raport from localStorage:', e);
+    }
+}
+
+function saveRaportToLocalStorage() {
+    try {
+        localStorage.setItem('absensiku_raport', JSON.stringify(allRaportData));
+    } catch (e) {}
+}
+
+function setupRaportRtdbListener() {
+    if (!rtdb) return;
+    rtdb.ref('raport').on('value', (snapshot) => {
+        const val = snapshot.val();
+        if (val) {
+            allRaportData = Object.entries(val).map(([id, item]) => ({ id, ...item }));
+            allRaportData.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        } else {
+            allRaportData = [];
+        }
+        saveRaportToLocalStorage();
+        renderRaportData();
+    });
+}
+
+function setupRaportFirestoreListener() {
+    if (!db) return;
+    db.collection('raport').onSnapshot((snapshot) => {
+        if (!snapshot.empty) {
+            allRaportData = [];
+            snapshot.forEach(doc => {
+                allRaportData.push({ id: doc.id, ...doc.data() });
+            });
+            allRaportData.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        } else {
+            allRaportData = [];
+        }
+        saveRaportToLocalStorage();
+        renderRaportData();
+    });
+}
+
+// --- POPULATE DROPDOWNS & AUTO FILL ---
+
+function populateRaportMuridSelect() {
+    const select = document.getElementById('raport-nama');
+    if (!select) return;
+
+    const currentVal = select.value;
+    select.innerHTML = '<option value="">— Pilih Caberawit —</option>';
+
+    if (allKaryawanData && allKaryawanData.length > 0) {
+        allKaryawanData.forEach(item => {
+            const opt = document.createElement('option');
+            opt.value = item.nama;
+            opt.textContent = `${item.nama} (${item.jabatan || 'Caberawit'})`;
+            opt.dataset.kelas = item.jabatan || '';
+            opt.dataset.telepon = item.telepon || '';
+            select.appendChild(opt);
+        });
+    }
+
+    if (currentVal) select.value = currentVal;
+
+    // Listener auto-select kelas saat nama murid dipilih
+    select.onchange = function() {
+        const selectedOpt = select.options[select.selectedIndex];
+        if (selectedOpt && selectedOpt.dataset.kelas) {
+            const kelasInput = document.getElementById('raport-kelas');
+            if (kelasInput) {
+                const kVal = selectedOpt.dataset.kelas;
+                for (let i = 0; i < kelasInput.options.length; i++) {
+                    if (kelasInput.options[i].value.toLowerCase().includes(kVal.toLowerCase()) || 
+                        kVal.toLowerCase().includes(kelasInput.options[i].value.toLowerCase())) {
+                        kelasInput.selectedIndex = i;
+                        break;
+                    }
+                }
+            }
+        }
+    };
+}
+
+// --- MODAL & FORM OPERATIONS ---
+
+function openAddRaportModal() {
+    const form = document.getElementById('raport-form');
+    if (form) form.reset();
+
+    document.getElementById('raport-edit-id').value = '';
+    document.getElementById('raport-modal-title').textContent = 'Tambah Raport Caberawit';
+    document.getElementById('raport-submit-text').textContent = 'Simpan Raport';
+
+    // Set default periode ke bulan sekarang YYYY-MM
+    const now = new Date();
+    const curMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const periodeEl = document.getElementById('raport-periode');
+    if (periodeEl) periodeEl.value = curMonth;
+
+    populateRaportMuridSelect();
+    openModal('modal-raport');
+}
+
+function openEditRaportModal(id) {
+    const item = allRaportData.find(r => r.id === id);
+    if (!item) {
+        showToast('Data raport tidak ditemukan.', 'error');
+        return;
+    }
+
+    populateRaportMuridSelect();
+
+    document.getElementById('raport-edit-id').value = item.id;
+    document.getElementById('raport-nama').value = item.nama || '';
+    document.getElementById('raport-kelas').value = item.kelas || '';
+    document.getElementById('raport-periode').value = item.periode || '';
+    document.getElementById('raport-mapel').value = item.mapel || '';
+    document.getElementById('raport-kekurangan').value = item.kekurangan || '';
+    document.getElementById('raport-saran').value = item.saran || '';
+    document.getElementById('raport-predikat').value = item.predikat || 'Baik';
+    document.getElementById('raport-status').value = item.status || 'Draft';
+    document.getElementById('raport-catatan').value = item.catatan || '';
+
+    document.getElementById('raport-modal-title').textContent = 'Edit Raport Caberawit';
+    document.getElementById('raport-submit-text').textContent = 'Perbarui Raport';
+
+    openModal('modal-raport');
+}
+
+async function handleSubmitRaport(event) {
+    event.preventDefault();
+
+    const editId = document.getElementById('raport-edit-id').value.trim();
+    const nama = document.getElementById('raport-nama').value.trim();
+    const kelas = document.getElementById('raport-kelas').value.trim();
+    const periode = document.getElementById('raport-periode').value.trim();
+    const mapel = document.getElementById('raport-mapel').value.trim();
+    const kekurangan = document.getElementById('raport-kekurangan').value.trim();
+    const saran = document.getElementById('raport-saran').value.trim();
+    const predikat = document.getElementById('raport-predikat').value;
+    const status = document.getElementById('raport-status').value;
+    const catatan = document.getElementById('raport-catatan').value.trim();
+
+    if (!nama || !kelas || !periode || !mapel || !kekurangan) {
+        showToast('Mohon lengkapi semua kolom bertanda bintang (*).', 'error');
+        return;
+    }
+
+    // Cari telepon wali murid jika ada
+    const studentInfo = allKaryawanData.find(k => k.nama.toLowerCase() === nama.toLowerCase());
+    const teleponWali = studentInfo ? (studentInfo.telepon || '') : '';
+
+    const id = editId || `raport-${Date.now()}`;
+    const raportItem = {
+        id,
+        nama,
+        kelas,
+        periode,
+        mapel,
+        kekurangan,
+        saran,
+        predikat,
+        status,
+        catatan,
+        teleponWali,
+        updatedAt: new Date().toISOString(),
+        timestamp: editId ? (allRaportData.find(r => r.id === editId)?.timestamp || Date.now()) : Date.now()
+    };
+
+    // Simpan ke Firebase jika online
+    if (isFirebaseConnected) {
+        if (activeEngine === 'rtdb' && rtdb) {
+            await rtdb.ref(`raport/${id}`).set(raportItem).catch(e => console.warn(e));
+        } else if (activeEngine === 'firestore' && db) {
+            await db.collection('raport').doc(id).set(raportItem).catch(e => console.warn(e));
+        }
+    }
+
+    // Simpan ke State & LocalStorage
+    const existingIdx = allRaportData.findIndex(r => r.id === id);
+    if (existingIdx >= 0) {
+        allRaportData[existingIdx] = raportItem;
+    } else {
+        allRaportData.unshift(raportItem);
+    }
+
+    saveRaportToLocalStorage();
+    closeModal('modal-raport');
+    renderRaportData();
+    showToast(editId ? 'Data raport berhasil diperbarui!' : 'Raport baru berhasil dicatat & disimpan!', 'success');
+}
+
+function confirmDeleteRaport(id) {
+    pendingDeleteRaportId = id;
+    openModal('modal-delete-raport');
+}
+
+async function executeDeleteRaport() {
+    if (!pendingDeleteRaportId) return;
+    const id = pendingDeleteRaportId;
+
+    if (isFirebaseConnected) {
+        if (activeEngine === 'rtdb' && rtdb) {
+            await rtdb.ref(`raport/${id}`).remove().catch(e => console.warn(e));
+        } else if (activeEngine === 'firestore' && db) {
+            await db.collection('raport').doc(id).delete().catch(e => console.warn(e));
+        }
+    }
+
+    allRaportData = allRaportData.filter(r => r.id !== id);
+    saveRaportToLocalStorage();
+    pendingDeleteRaportId = null;
+    closeModal('modal-delete-raport');
+    renderRaportData();
+    showToast('Raport berhasil dihapus.', 'info');
+}
+
+// --- FILTERING & RENDERING ---
+
+function filterRaportTable() {
+    const searchVal = document.getElementById('search-raport')?.value?.toLowerCase().trim() || '';
+    const periodeVal = document.getElementById('filter-raport-periode')?.value || 'semua';
+    const kelasVal = document.getElementById('filter-raport-kelas')?.value || 'semua';
+
+    const now = new Date();
+    const curYear = now.getFullYear();
+    const curMonth = now.getMonth();
+
+    filteredRaportData = allRaportData.filter(item => {
+        if (searchVal && !((item.nama || '').toLowerCase().includes(searchVal) || (item.mapel || '').toLowerCase().includes(searchVal) || (item.kekurangan || '').toLowerCase().includes(searchVal))) {
+            return false;
+        }
+
+        if (kelasVal !== 'semua' && item.kelas !== kelasVal) {
+            return false;
+        }
+
+        if (periodeVal !== 'semua' && item.periode) {
+            const [pY, pM] = item.periode.split('-').map(Number);
+            const diffMonths = (curYear - pY) * 12 + (curMonth - (pM - 1));
+
+            if (periodeVal === 'bulan-ini' && diffMonths !== 0) return false;
+            if (periodeVal === '3-bulan' && (diffMonths < 0 || diffMonths > 2)) return false;
+            if (periodeVal === '6-bulan' && (diffMonths < 0 || diffMonths > 5)) return false;
+        }
+
+        return true;
+    });
+
+    renderRaportTableBody();
+    updateRaportStats();
+}
+
+function updateRaportStats() {
+    const totalEl = document.getElementById('stat-total-raport');
+    const muridEl = document.getElementById('stat-murid-dinilai');
+    const perluEl = document.getElementById('stat-perlu-perbaikan');
+    const kirimEl = document.getElementById('stat-sudah-dikirim');
+    const countEl = document.getElementById('raport-count');
+
+    const total = allRaportData.length;
+    const uniqueMurid = new Set(allRaportData.map(r => r.nama.trim().toLowerCase())).size;
+    const perluBimbingan = allRaportData.filter(r => r.predikat === 'Perlu Bimbingan' || r.predikat === 'Cukup').length;
+    const terkirim = allRaportData.filter(r => r.status === 'Dikirim').length;
+
+    if (totalEl) totalEl.textContent = total;
+    if (muridEl) muridEl.textContent = uniqueMurid;
+    if (perluEl) perluEl.textContent = perluBimbingan;
+    if (kirimEl) kirimEl.textContent = terkirim;
+    if (countEl) countEl.textContent = filteredRaportData.length;
+}
+
+function renderRaportData() {
+    filterRaportTable();
+}
+
+function renderRaportTableBody() {
+    const tbody = document.getElementById('raport-table-body');
+    const cardList = document.getElementById('raport-card-list');
+    const emptyState = document.getElementById('raport-empty');
+
+    if (!tbody) return;
+
+    if (filteredRaportData.length === 0) {
+        tbody.innerHTML = '';
+        if (cardList) cardList.innerHTML = '';
+        if (emptyState) {
+            emptyState.classList.remove('hidden');
+            emptyState.classList.add('flex');
+        }
+        return;
+    }
+
+    if (emptyState) {
+        emptyState.classList.add('hidden');
+        emptyState.classList.remove('flex');
+    }
+
+    // Predikat badge styling
+    const predikatBadge = (pred) => {
+        if (pred === 'Sangat Baik') return '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700"><i class="fa-solid fa-star text-[9px]"></i> Sangat Baik</span>';
+        if (pred === 'Baik') return '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-100 text-teal-700"><i class="fa-solid fa-check text-[9px]"></i> Baik</span>';
+        if (pred === 'Cukup') return '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700"><i class="fa-solid fa-circle-exclamation text-[9px]"></i> Cukup</span>';
+        return '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700"><i class="fa-solid fa-triangle-exclamation text-[9px]"></i> Perlu Bimbingan</span>';
+    };
+
+    // Status badge styling
+    const statusBadge = (st) => {
+        if (st === 'Dikirim') return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"><i class="fa-solid fa-paper-plane text-[8px]"></i> Dikirim</span>';
+        return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-surface-100 text-surface-600 border border-surface-200"><i class="fa-solid fa-pen text-[8px]"></i> Draft</span>';
+    };
+
+    // 1. Desktop Table
+    tbody.innerHTML = filteredRaportData.map((item, idx) => `
+        <tr class="hover:bg-surface-50/70 transition-colors group">
+            <td class="px-5 py-3.5 text-xs text-surface-400 font-mono">${idx + 1}</td>
+            <td class="px-5 py-3.5">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center text-xs font-bold shrink-0">
+                        ${getInitials(item.nama)}
+                    </div>
+                    <div>
+                        <p class="font-bold text-surface-900 text-sm">${escapeHtml(item.nama)}</p>
+                        <p class="text-[11px] text-surface-400"><i class="fa-solid fa-book-open text-violet-500 mr-1 text-[9px]"></i>${escapeHtml(item.mapel || '-')}</p>
+                    </div>
+                </div>
+            </td>
+            <td class="px-5 py-3.5">
+                <span class="inline-block px-2.5 py-1 rounded-lg text-xs font-medium bg-surface-100 text-surface-700">${escapeHtml(item.kelas)}</span>
+            </td>
+            <td class="px-5 py-3.5 text-xs font-mono text-surface-600">
+                ${formatPeriode(item.periode)}
+            </td>
+            <td class="px-5 py-3.5 max-w-xs">
+                <div class="text-xs text-surface-700 line-clamp-2 leading-relaxed" title="${escapeHtml(item.kekurangan)}">
+                    <span class="text-rose-600 font-semibold"><i class="fa-solid fa-circle-exclamation text-[10px] mr-1"></i></span>
+                    ${escapeHtml(item.kekurangan)}
+                </div>
+                <div class="mt-1">${predikatBadge(item.predikat)}</div>
+            </td>
+            <td class="px-5 py-3.5 text-center">
+                ${statusBadge(item.status)}
+            </td>
+            <td class="px-5 py-3.5 text-center">
+                <div class="flex items-center justify-center gap-1">
+                    <button onclick="viewRaportDetail('${item.id}')"
+                        class="p-1.5 rounded-lg hover:bg-violet-50 text-surface-400 hover:text-violet-600 transition-colors" title="Lihat & Bagikan Raport">
+                        <i class="fa-solid fa-eye text-xs"></i>
+                    </button>
+                    <button onclick="downloadSingleRaport('${item.id}')"
+                        class="p-1.5 rounded-lg hover:bg-emerald-50 text-surface-400 hover:text-emerald-600 transition-colors" title="Download / Cetak PDF">
+                        <i class="fa-solid fa-download text-xs"></i>
+                    </button>
+                    <button onclick="sendRaportToWhatsApp('${item.id}')"
+                        class="p-1.5 rounded-lg hover:bg-emerald-50 text-surface-400 hover:text-emerald-600 transition-colors" title="Kirim ke WhatsApp Wali">
+                        <i class="fa-brands fa-whatsapp text-xs"></i>
+                    </button>
+                    <button onclick="openEditRaportModal('${item.id}')"
+                        class="p-1.5 rounded-lg hover:bg-blue-50 text-surface-400 hover:text-blue-600 transition-colors" title="Edit Data">
+                        <i class="fa-solid fa-pen text-xs"></i>
+                    </button>
+                    <button onclick="confirmDeleteRaport('${item.id}')"
+                        class="p-1.5 rounded-lg hover:bg-rose-50 text-surface-400 hover:text-rose-600 transition-colors" title="Hapus Raport">
+                        <i class="fa-solid fa-trash-can text-xs"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+
+    // 2. Mobile Cards
+    if (cardList) {
+        cardList.innerHTML = filteredRaportData.map(item => `
+            <div class="p-4 space-y-3">
+                <div class="flex items-start justify-between gap-2">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-9 h-9 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center text-xs font-bold shrink-0">
+                            ${getInitials(item.nama)}
+                        </div>
+                        <div>
+                            <p class="font-bold text-surface-900 text-sm">${escapeHtml(item.nama)}</p>
+                            <p class="text-[11px] text-surface-400">${escapeHtml(item.kelas)} • ${formatPeriode(item.periode)}</p>
+                        </div>
+                    </div>
+                    <div>${statusBadge(item.status)}</div>
+                </div>
+
+                <div class="bg-surface-50 p-3 rounded-xl border border-surface-100 text-xs space-y-1.5">
+                    <div class="flex items-center justify-between">
+                        <span class="font-semibold text-surface-700"><i class="fa-solid fa-book-open text-violet-500 mr-1"></i>${escapeHtml(item.mapel)}</span>
+                        ${predikatBadge(item.predikat)}
+                    </div>
+                    <div class="text-surface-600 text-[11px] pt-1 border-t border-surface-200/60 leading-relaxed">
+                        <b class="text-rose-600">Kekurangan:</b> ${escapeHtml(item.kekurangan)}
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-1.5 pt-1">
+                    <button onclick="viewRaportDetail('${item.id}')" class="px-2.5 py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 text-xs font-semibold rounded-lg transition-all">
+                        <i class="fa-solid fa-eye mr-1"></i> Detail
+                    </button>
+                    <button onclick="downloadSingleRaport('${item.id}')" class="px-2.5 py-1.5 bg-surface-100 hover:bg-surface-200 text-surface-700 text-xs font-semibold rounded-lg transition-all">
+                        <i class="fa-solid fa-download mr-1"></i> PDF
+                    </button>
+                    <button onclick="sendRaportToWhatsApp('${item.id}')" class="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-lg transition-all">
+                        <i class="fa-brands fa-whatsapp mr-1"></i> WA
+                    </button>
+                    <button onclick="openEditRaportModal('${item.id}')" class="p-1.5 rounded-lg hover:bg-blue-50 text-surface-400 hover:text-blue-600">
+                        <i class="fa-solid fa-pen text-xs"></i>
+                    </button>
+                    <button onclick="confirmDeleteRaport('${item.id}')" class="p-1.5 rounded-lg hover:bg-rose-50 text-surface-400 hover:text-rose-600">
+                        <i class="fa-solid fa-trash-can text-xs"></i>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
+}
+
+function formatPeriode(periodeStr) {
+    if (!periodeStr) return '-';
+    const parts = periodeStr.split('-');
+    if (parts.length !== 2) return periodeStr;
+    const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    const mIdx = parseInt(parts[1]) - 1;
+    return `${months[mIdx] || parts[1]} ${parts[0]}`;
+}
+
+// --- DETAIL MODAL, PRINT, & WHATSAPP EXPORT ---
+
+function viewRaportDetail(id) {
+    const item = allRaportData.find(r => r.id === id);
+    if (!item) return;
+
+    const content = document.getElementById('raport-detail-content');
+    if (!content) return;
+
+    const portalUrl = `${window.location.origin}${window.location.pathname.replace('index.html', '')}raport.html?id=${item.id}`;
+
+    content.innerHTML = `
+        <!-- Header Siswa -->
+        <div class="flex items-center gap-3.5 p-4 rounded-2xl bg-gradient-to-r from-violet-50 to-indigo-50 border border-violet-100">
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-700 text-white font-extrabold text-base flex items-center justify-center shadow-md shadow-violet-500/20 shrink-0">
+                ${getInitials(item.nama)}
+            </div>
+            <div class="min-w-0 flex-1">
+                <div class="flex items-center justify-between gap-2">
+                    <h4 class="text-base font-bold text-surface-900 truncate">${escapeHtml(item.nama)}</h4>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${item.status === 'Dikirim' ? 'bg-emerald-100 text-emerald-700' : 'bg-surface-200 text-surface-700'}">${escapeHtml(item.status)}</span>
+                </div>
+                <p class="text-xs text-surface-500 mt-0.5">${escapeHtml(item.kelas)} • Periode ${formatPeriode(item.periode)}</p>
+            </div>
+        </div>
+
+        <!-- Info Mapel & Predikat -->
+        <div class="grid grid-cols-2 gap-3">
+            <div class="p-3 rounded-xl bg-surface-50 border border-surface-100">
+                <p class="text-[10px] uppercase font-bold text-surface-400">Mata Pelajaran</p>
+                <p class="text-xs sm:text-sm font-bold text-surface-800 mt-0.5">${escapeHtml(item.mapel)}</p>
+            </div>
+            <div class="p-3 rounded-xl bg-surface-50 border border-surface-100">
+                <p class="text-[10px] uppercase font-bold text-surface-400">Predikat / Nilai</p>
+                <p class="text-xs sm:text-sm font-bold text-violet-700 mt-0.5">${escapeHtml(item.predikat)}</p>
+            </div>
+        </div>
+
+        <!-- KEKURANGAN MATERI (Highlight Utama) -->
+        <div class="p-4 rounded-2xl bg-rose-50/70 border border-rose-200">
+            <div class="flex items-center gap-2 mb-2">
+                <div class="w-6 h-6 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center text-xs">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <h5 class="text-xs font-bold text-rose-900 uppercase tracking-wide">Kekurangan Materi yang Perlu Ditingkatkan</h5>
+            </div>
+            <p class="text-xs sm:text-sm text-surface-800 leading-relaxed font-medium pl-8">${escapeHtml(item.kekurangan)}</p>
+        </div>
+
+        <!-- SARAN PEMBINAAN DI RUMAH -->
+        <div class="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200">
+            <div class="flex items-center gap-2 mb-2">
+                <div class="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs">
+                    <i class="fa-solid fa-lightbulb"></i>
+                </div>
+                <h5 class="text-xs font-bold text-emerald-900 uppercase tracking-wide">Saran Pendampingan Orang Tua di Rumah</h5>
+            </div>
+            <p class="text-xs sm:text-sm text-surface-800 leading-relaxed pl-8">${escapeHtml(item.saran || 'Mohon dibantu mengulang dan membiasakan materi di rumah.')}</p>
+        </div>
+
+        ${item.catatan ? `
+        <div class="p-3.5 rounded-xl bg-surface-50 border border-surface-100 text-xs">
+            <p class="text-[10px] uppercase font-bold text-surface-400 mb-1"><i class="fa-solid fa-comment-dots mr-1"></i>Catatan Tambahan Guru:</p>
+            <p class="text-surface-700">${escapeHtml(item.catatan)}</p>
+        </div>
+        ` : ''}
+
+        <!-- Link Portal Orang Tua -->
+        <div class="p-3 rounded-xl bg-violet-50/60 border border-violet-100 flex items-center justify-between gap-2">
+            <div class="min-w-0">
+                <p class="text-[11px] font-bold text-violet-900">Tautan Akses Orang Tua (Read-Only):</p>
+                <p class="text-[10px] text-violet-600/80 truncate font-mono">${portalUrl}</p>
+            </div>
+            <button onclick="copyRaportLink('${item.id}')" class="px-2.5 py-1.5 bg-white hover:bg-violet-100 text-violet-700 text-[11px] font-semibold rounded-lg border border-violet-200 shrink-0">
+                <i class="fa-solid fa-copy mr-1"></i> Salin
+            </button>
+        </div>
+    `;
+
+    // Hook buttons
+    const btnWa = document.getElementById('btn-detail-wa');
+    const btnDl = document.getElementById('btn-detail-download');
+    if (btnWa) btnWa.onclick = () => sendRaportToWhatsApp(item.id);
+    if (btnDl) btnDl.onclick = () => downloadSingleRaport(item.id);
+
+    openModal('modal-raport-detail');
+}
+
+function sendRaportToWhatsApp(id) {
+    const item = allRaportData.find(r => r.id === id);
+    if (!item) return;
+
+    // Cari telepon wali
+    let phone = (item.teleponWali || '').replace(/[^0-9]/g, '');
+    if (phone.startsWith('0')) {
+        phone = '62' + phone.substring(1);
+    }
+
+    const portalUrl = `${window.location.origin}${window.location.pathname.replace('index.html', '')}raport.html?id=${item.id}`;
+
+    const text = `Assalamu'alaikum Warahmatullahi Wabarakatuh.
+Yth. Bapak/Ibu Wali dari Ananda *${item.nama}*,
+
+Berikut kami sampaikan lembar Evaluasi & Raport Perkembangan Caberawit:
+👤 *Nama Santri:* ${item.nama}
+🏫 *Kelas:* ${item.kelas}
+📅 *Periode:* ${formatPeriode(item.periode)}
+📖 *Mata Pelajaran:* ${item.mapel}
+⭐ *Predikat Hasil Belajar:* ${item.predikat}
+
+⚠️ *Kekurangan Materi yang Perlu Ditingkatkan:*
+_${item.kekurangan}_
+
+💡 *Saran Pendampingan di Rumah:*
+_${item.saran || 'Mohon dibantu latihan rutin di rumah.'}_
+${item.catatan ? `\n📝 *Catatan Guru:* ${item.catatan}` : ''}
+
+Bapak/Ibu dapat melihat lembar raport digital resmi & mengunduh PDF melalui tautan:
+🔗 ${portalUrl}
+
+Alhamdulillah Jazakumullahu Khoiro atas kerja sama dan perhatiannya.
+Wassalamu'alaikum Warahmatullahi Wabarakatuh.`;
+
+    const encoded = encodeURIComponent(text);
+    const waUrl = phone ? `https://wa.me/${phone}?text=${encoded}` : `https://wa.me/?text=${encoded}`;
+    window.open(waUrl, '_blank');
+}
+
+function downloadSingleRaport(id) {
+    const item = allRaportData.find(r => r.id === id);
+    if (!item) return;
+
+    const portalUrl = `${window.location.origin}${window.location.pathname.replace('index.html', '')}raport.html?id=${item.id}`;
+    const dateFormatted = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+
+    const printWin = window.open('', '_blank');
+    printWin.document.write(`
+        <!DOCTYPE html>
+        <html lang="id">
+        <head>
+            <meta charset="UTF-8">
+            <title>Raport Caberawit - ${escapeHtml(item.nama)}</title>
+            <style>
+                @page { size: A4 portrait; margin: 15mm; }
+                * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #1e293b; background: #fff; margin: 0; padding: 20px; line-height: 1.5; }
+                .kop { text-align: center; border-bottom: 3px double #0f172a; padding-bottom: 12px; margin-bottom: 20px; }
+                .kop h2 { margin: 0; font-size: 18px; color: #1e1b4b; text-transform: uppercase; letter-spacing: 0.5px; }
+                .kop h1 { margin: 4px 0; font-size: 21px; color: #4338ca; }
+                .kop p { margin: 0; font-size: 11px; color: #64748b; }
+                .badge-title { display: inline-block; background: #ede9fe; color: #5b21b6; padding: 5px 14px; border-radius: 999px; font-size: 12px; font-weight: bold; margin-bottom: 15px; border: 1px solid #ddd6fe; }
+                .identity-table { width: 100%; border-collapse: collapse; margin-bottom: 18px; font-size: 12px; }
+                .identity-table td { padding: 6px 10px; border-bottom: 1px solid #f1f5f9; }
+                .identity-table td.label { width: 28%; font-weight: bold; color: #475569; background: #f8fafc; }
+                .box { border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; page-break-inside: avoid; }
+                .box-warning { background: #fff1f2; border: 1.5px solid #fecdd3; }
+                .box-warning h3 { margin: 0 0 6px 0; font-size: 13px; color: #9f1239; }
+                .box-warning p { margin: 0; font-size: 12px; color: #334155; }
+                .box-success { background: #f0fdf4; border: 1.5px solid #bbf7d0; }
+                .box-success h3 { margin: 0 0 6px 0; font-size: 13px; color: #166534; }
+                .box-success p { margin: 0; font-size: 12px; color: #334155; }
+                .box-note { background: #f8fafc; border: 1px solid #e2e8f0; font-size: 11px; color: #64748b; }
+                .signatures { margin-top: 35px; width: 100%; display: table; font-size: 12px; }
+                .sig-col { display: table-cell; width: 50%; text-align: center; }
+                .sig-space { height: 60px; }
+                .footer { margin-top: 30px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 10px; }
+                @media print { body { padding: 0; } }
+            </style>
+        </head>
+        <body>
+            <div class="kop">
+                <h2>Lembaga Pembinaan Caberawit & Generasi Penerus</h2>
+                <h1>LEMBAR RAPORT & EVALUASI BELAJAR</h1>
+                <p>Sistem Informasi Perkembangan Pembelajaran Caberawit Terintegrasi</p>
+            </div>
+
+            <div style="text-align: center;">
+                <span class="badge-title">RAPORT PERIODE: ${formatPeriode(item.periode).toUpperCase()}</span>
+            </div>
+
+            <table class="identity-table">
+                <tr>
+                    <td class="label">Nama Lengkap Murid</td>
+                    <td><b>${escapeHtml(item.nama)}</b></td>
+                    <td class="label">Kelas / Kelompok</td>
+                    <td>${escapeHtml(item.kelas)}</td>
+                </tr>
+                <tr>
+                    <td class="label">Mata Pelajaran</td>
+                    <td><b>${escapeHtml(item.mapel)}</b></td>
+                    <td class="label">Predikat Capaian</td>
+                    <td><b>${escapeHtml(item.predikat)}</b></td>
+                </tr>
+                <tr>
+                    <td class="label">Status Evaluasi</td>
+                    <td>${escapeHtml(item.status)}</td>
+                    <td class="label">Tanggal Cetak</td>
+                    <td>${dateFormatted}</td>
+                </tr>
+            </table>
+
+            <div class="box box-warning">
+                <h3>⚠️ KEKURANGAN MATERI (HAL YANG PERLU DITINGKATKAN):</h3>
+                <p>${escapeHtml(item.kekurangan).replace(/\n/g, '<br>')}</p>
+            </div>
+
+            <div class="box box-success">
+                <h3>💡 SARAN PEMBINAAN & PENDAMPINGAN ORANG TUA DI RUMAH:</h3>
+                <p>${escapeHtml(item.saran || 'Mohon kerja sama orang tua untuk mendampingi putra/putrinya mengulang materi di rumah.').replace(/\n/g, '<br>')}</p>
+            </div>
+
+            ${item.catatan ? `
+            <div class="box box-note">
+                <b>Catatan Guru Pengajar:</b><br>
+                ${escapeHtml(item.catatan).replace(/\n/g, '<br>')}
+            </div>
+            ` : ''}
+
+            <table class="signatures">
+                <tr>
+                    <td class="sig-col">
+                        Mengetahui,<br>
+                        <b>Orang Tua / Wali Murid</b>
+                        <div class="sig-space"></div>
+                        ( ............................................ )
+                    </td>
+                    <td class="sig-col">
+                        Ditetapkan pada: ${dateFormatted}<br>
+                        <b>Guru Pengajar / Wali Kelas</b>
+                        <div class="sig-space"></div>
+                        ( <b>Ustadz / Ustadzah</b> )
+                    </td>
+                </tr>
+            </table>
+
+            <div class="footer">
+                Dokumen raport resmi dicetak melalui Sistem AbsensiKu. Verifikasi raport online: ${portalUrl}
+            </div>
+        </body>
+        </html>
+    `);
+    printWin.document.close();
+    setTimeout(() => printWin.print(), 500);
+}
+
+function downloadAllRaportPDF() {
+    if (filteredRaportData.length === 0) {
+        showToast('Tidak ada data raport untuk diunduh.', 'warning');
+        return;
+    }
+
+    const rows = filteredRaportData.map((item, idx) => `
+        <tr>
+            <td style="padding:6px;border:1px solid #cbd5e1;text-align:center;font-size:11px;">${idx + 1}</td>
+            <td style="padding:6px;border:1px solid #cbd5e1;font-weight:bold;font-size:11px;">${escapeHtml(item.nama)}</td>
+            <td style="padding:6px;border:1px solid #cbd5e1;font-size:11px;">${escapeHtml(item.kelas)}</td>
+            <td style="padding:6px;border:1px solid #cbd5e1;font-size:11px;">${formatPeriode(item.periode)}</td>
+            <td style="padding:6px;border:1px solid #cbd5e1;font-size:11px;">${escapeHtml(item.mapel)}</td>
+            <td style="padding:6px;border:1px solid #cbd5e1;font-size:10px;color:#991b1b;">${escapeHtml(item.kekurangan)}</td>
+            <td style="padding:6px;border:1px solid #cbd5e1;font-size:10px;color:#166534;">${escapeHtml(item.saran || '-')}</td>
+            <td style="padding:6px;border:1px solid #cbd5e1;text-align:center;font-size:11px;font-weight:bold;">${escapeHtml(item.predikat)}</td>
+        </tr>
+    `).join('');
+
+    const printWin = window.open('', '_blank');
+    printWin.document.write(`
+        <html>
+        <head>
+            <title>Rekap Raport Caberawit</title>
+            <style>
+                body { font-family: 'Segoe UI', sans-serif; padding: 20px; color: #1e293b; }
+                h2 { text-align: center; margin-bottom: 4px; color: #4338ca; }
+                p.sub { text-align: center; color: #64748b; font-size: 12px; margin-bottom: 20px; }
+                table { width: 100%; border-collapse: collapse; }
+                th { background: #4f46e5; color: #fff; padding: 8px 6px; font-size: 11px; text-align: left; border: 1px solid #4338ca; }
+                @media print { body { padding: 0; } }
+            </style>
+        </head>
+        <body>
+            <h2>REKAP EVALUASI & KEKURANGAN MATERI CABERAWIT</h2>
+            <p class="sub">Dicetak pada: ${new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} • Total: ${filteredRaportData.length} data</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width:30px;text-align:center;">No</th>
+                        <th>Nama Murid</th>
+                        <th>Kelas</th>
+                        <th>Periode</th>
+                        <th>Mata Pelajaran</th>
+                        <th>Kekurangan Materi</th>
+                        <th>Saran Bimbingan</th>
+                        <th>Predikat</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </body>
+        </html>
+    `);
+    printWin.document.close();
+    setTimeout(() => printWin.print(), 500);
+}
+
+function copyRaportLink(id) {
+    let url = `${window.location.origin}${window.location.pathname.replace('index.html', '')}raport.html`;
+    if (id) {
+        url += `?id=${id}`;
+    }
+    navigator.clipboard.writeText(url).then(() => {
+        showToast('Tautan portal orang tua berhasil disalin ke clipboard!', 'success');
+    }).catch(() => {
+        prompt('Salin tautan ini:', url);
+    });
+}
+
+
+// --- HOOK INIT ON DOMContentLoaded & FIREBASE CONNECT ---
 const _originalConnectToFirebase = connectToFirebase;
 connectToFirebase = async function() {
     await _originalConnectToFirebase();
     initJurnalModule();
+    initRaportModule();
 };
 
-// Also load jurnal data immediately from localStorage
+// Muat data lokal seketika
 loadJurnalFromLocalStorage();
+loadRaportFromLocalStorage();
+

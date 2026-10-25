@@ -129,7 +129,7 @@
                     <i class="fa-solid fa-fingerprint text-white text-lg"></i>
                 </div>
                 <div>
-                    <h1 class="text-lg font-bold text-surface-900 leading-tight">AbsensiKu</h1>
+                    <h1 class="text-lg font-bold text-surface-900 leading-tight">TPQ AL-WASHIYYAH</h1>
                     <p class="text-[11px] text-surface-400 font-medium tracking-wide uppercase">Admin Panel</p>
                 </div>
                 <!-- Close button (mobile only) -->
@@ -168,7 +168,7 @@
                         <i class="fa-solid fa-qrcode text-[15px]"></i>
                     </div>
                     <span>Scan QR Absensi</span>
-                    <span class="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Auto</span>
+                    <!-- <span class="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Auto</span> -->
                 </a>
 
                 <a href="#" id="nav-rekap" onclick="navigateTo('rekap')"
@@ -199,6 +199,16 @@
                     <span id="badge-jurnal-today" class="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary-100 text-primary-700 hidden">0</span>
                 </a>
 
+                <a href="#" id="nav-raport" onclick="navigateTo('raport')"
+                    class="nav-link group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200">
+                    <div
+                        class="nav-icon-wrap w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200">
+                        <i class="fa-solid fa-scroll text-[15px]"></i>
+                    </div>
+                    <span>Raport Caberawit</span>
+                    <!-- <span class="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700">New</span> -->
+                </a>
+
                 <div class="pt-4">
                     <p class="text-[10px] font-bold text-surface-400 uppercase tracking-widest px-3 mb-3">Lainnya</p>
                 </div>
@@ -222,7 +232,7 @@
                     </div>
                     <div class="flex-1 min-w-0">
                         <p class="text-sm font-semibold text-surface-800 truncate">Admin</p>
-                        <p class="text-[11px] text-surface-400 truncate">admin@absensi.id</p>
+                        <p class="text-[11px] text-surface-400 truncate"><i class="fa-solid fa-user-graduate"></i> By Nabil & Charla</p>
                     </div>
                     <button
                         class="p-1.5 rounded-lg hover:bg-red-50 text-surface-400 hover:text-red-500 transition-colors"
@@ -1222,6 +1232,164 @@
                 </section>
 
                 <!-- ============================
+                 SECTION: RAPORT CABERAWIT (ADMIN)
+                 ============================ -->
+                <section id="section-raport" class="page-section hidden">
+                    <!-- Stat Cards -->
+                    <div class="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-5 mb-6">
+                        <div class="stat-card group relative overflow-hidden bg-white rounded-2xl border border-surface-200/60 p-4 sm:p-5 shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-1 cursor-default animate-slide-up">
+                            <div class="absolute top-0 right-0 w-24 h-24 bg-violet-500/5 rounded-full -translate-y-8 translate-x-8 group-hover:scale-150 transition-transform duration-500"></div>
+                            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between relative gap-2">
+                                <div class="order-2 sm:order-1">
+                                    <p class="text-[10px] sm:text-xs font-semibold text-surface-400 uppercase tracking-wider mb-0.5 sm:mb-1">Total Raport</p>
+                                    <p id="stat-total-raport" class="text-2xl sm:text-3xl font-extrabold text-surface-900 tabular-nums">0</p>
+                                </div>
+                                <div class="order-1 sm:order-2 w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center shadow-lg shadow-violet-500/20 text-white text-sm sm:text-lg">
+                                    <i class="fa-solid fa-scroll"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stat-card group relative overflow-hidden bg-white rounded-2xl border border-surface-200/60 p-4 sm:p-5 shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-1 cursor-default animate-slide-up" style="animation-delay: 0.05s">
+                            <div class="absolute top-0 right-0 w-24 h-24 bg-teal-500/5 rounded-full -translate-y-8 translate-x-8 group-hover:scale-150 transition-transform duration-500"></div>
+                            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between relative gap-2">
+                                <div class="order-2 sm:order-1">
+                                    <p class="text-[10px] sm:text-xs font-semibold text-surface-400 uppercase tracking-wider mb-0.5 sm:mb-1">Murid Dinilai</p>
+                                    <p id="stat-murid-dinilai" class="text-2xl sm:text-3xl font-extrabold text-teal-600 tabular-nums">0</p>
+                                </div>
+                                <div class="order-1 sm:order-2 w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center shadow-lg shadow-teal-500/20 text-white text-sm sm:text-lg">
+                                    <i class="fa-solid fa-user-graduate"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stat-card group relative overflow-hidden bg-white rounded-2xl border border-surface-200/60 p-4 sm:p-5 shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-1 cursor-default animate-slide-up" style="animation-delay: 0.1s">
+                            <div class="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full -translate-y-8 translate-x-8 group-hover:scale-150 transition-transform duration-500"></div>
+                            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between relative gap-2">
+                                <div class="order-2 sm:order-1">
+                                    <p class="text-[10px] sm:text-xs font-semibold text-surface-400 uppercase tracking-wider mb-0.5 sm:mb-1">Perlu Perbaikan</p>
+                                    <p id="stat-perlu-perbaikan" class="text-2xl sm:text-3xl font-extrabold text-amber-600 tabular-nums">0</p>
+                                </div>
+                                <div class="order-1 sm:order-2 w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center shadow-lg shadow-amber-500/20 text-white text-sm sm:text-lg">
+                                    <i class="fa-solid fa-triangle-exclamation"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stat-card group relative overflow-hidden bg-white rounded-2xl border border-surface-200/60 p-4 sm:p-5 shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-1 cursor-default animate-slide-up" style="animation-delay: 0.15s">
+                            <div class="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -translate-y-8 translate-x-8 group-hover:scale-150 transition-transform duration-500"></div>
+                            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between relative gap-2">
+                                <div class="order-2 sm:order-1">
+                                    <p class="text-[10px] sm:text-xs font-semibold text-surface-400 uppercase tracking-wider mb-0.5 sm:mb-1">Sudah Dikirim</p>
+                                    <p id="stat-sudah-dikirim" class="text-2xl sm:text-3xl font-extrabold text-emerald-600 tabular-nums">0</p>
+                                </div>
+                                <div class="order-1 sm:order-2 w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-white text-sm sm:text-lg">
+                                    <i class="fa-solid fa-paper-plane"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Main Raport Container -->
+                    <div class="bg-white rounded-2xl border border-surface-200/60 shadow-card overflow-hidden animate-slide-up">
+                        <div class="flex flex-col gap-4 p-4 sm:p-6 border-b border-surface-100">
+                            <div class="flex items-start justify-between">
+                                <div>
+                                    <h3 class="text-sm sm:text-lg font-bold text-surface-900 flex items-center gap-2">
+                                        <span>Raport Kekurangan Materi</span>
+                                        <span class="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-violet-50 text-violet-600 border border-violet-200/60">
+                                            <span id="raport-count">0</span> Data
+                                        </span>
+                                    </h3>
+                                    <p class="text-[10px] sm:text-xs text-surface-400 mt-0.5">Catatan kekurangan materi setiap caberawit untuk disampaikan kepada orang tua</p>
+                                </div>
+                                <button onclick="openAddRaportModal()"
+                                    class="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-700 hover:to-violet-800 text-white text-[11px] sm:text-sm font-semibold rounded-xl shadow-lg shadow-violet-500/25 active:scale-[0.98] transition-all whitespace-nowrap">
+                                    <i class="fa-solid fa-plus text-[10px] sm:text-xs"></i>
+                                    <span class="hidden sm:inline">Tambah Raport</span>
+                                    <span class="sm:hidden">Tambah</span>
+                                </button>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <div class="relative flex-1 min-w-[140px]">
+                                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 text-[10px] sm:text-xs"></i>
+                                    <input id="search-raport" type="text" placeholder="Cari nama murid..."
+                                        oninput="filterRaportTable()"
+                                        class="text-[11px] sm:text-sm bg-surface-50 border border-surface-200 rounded-xl pl-8 sm:pl-9 pr-3 py-2 sm:py-2.5 w-full focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all placeholder:text-surface-400" />
+                                </div>
+                                <select id="filter-raport-periode" onchange="filterRaportTable()"
+                                    class="bg-white border border-surface-200 rounded-lg px-2 py-1.5 sm:py-2.5 text-surface-700 focus:ring-1 focus:ring-primary-500 font-medium text-[11px] sm:text-xs">
+                                    <option value="semua">Semua Periode</option>
+                                    <option value="bulan-ini">Bulan Ini</option>
+                                    <option value="3-bulan">3 Bulan Terakhir</option>
+                                    <option value="6-bulan">6 Bulan Terakhir</option>
+                                </select>
+                                <select id="filter-raport-kelas" onchange="filterRaportTable()"
+                                    class="bg-white border border-surface-200 rounded-lg px-2 py-1.5 sm:py-2.5 text-surface-700 focus:ring-1 focus:ring-primary-500 font-medium text-[11px] sm:text-xs">
+                                    <option value="semua">Semua Kelas</option>
+                                    <option value="Caberawit PAUD/TK">Caberawit PAUD/TK</option>
+                                    <option value="Caberawit Ula (SD 1-3)">Caberawit Ula (SD 1-3)</option>
+                                    <option value="Caberawit Wustho (SD 4-6)">Caberawit Wustho (SD 4-6)</option>
+                                    <option value="Pra-Remaja (SMP)">Pra-Remaja (SMP)</option>
+                                    <option value="Remaja (SMA/Kuliah)">Remaja (SMA/Kuliah)</option>
+                                </select>
+                                <button onclick="downloadAllRaportPDF()"
+                                    class="inline-flex items-center gap-1.5 px-3 py-2 sm:py-2.5 bg-violet-50 hover:bg-violet-100 text-violet-700 text-[11px] sm:text-xs font-semibold rounded-xl transition-all border border-violet-200/80 active:scale-95"
+                                    title="Download Semua Raport">
+                                    <i class="fa-solid fa-download text-xs"></i>
+                                    <span class="hidden sm:inline">Download</span>
+                                </button>
+                            </div>
+                            <div class="flex items-center gap-3 p-3 bg-gradient-to-r from-violet-50/80 to-indigo-50/50 rounded-xl border border-violet-200/60">
+                                <div class="w-9 h-9 rounded-lg bg-violet-100 text-violet-600 flex items-center justify-center flex-shrink-0">
+                                    <i class="fa-solid fa-link text-sm"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-[11px] sm:text-xs font-semibold text-violet-800">Link Akses Orang Tua</p>
+                                    <p class="text-[10px] text-violet-600/70 truncate">Bagikan link raport.html kepada wali murid untuk melihat raport anak mereka</p>
+                                </div>
+                                <div class="flex items-center gap-1.5 shrink-0">
+                                    <button onclick="copyRaportLink()" class="inline-flex items-center gap-1 px-2.5 py-1.5 bg-white hover:bg-violet-50 text-violet-700 text-[10px] sm:text-[11px] font-semibold rounded-lg border border-violet-200 transition-all active:scale-95 whitespace-nowrap">
+                                        <i class="fa-solid fa-copy text-[10px]"></i> Salin Link
+                                    </button>
+                                    <a href="raport.html" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-[10px] sm:text-[11px] font-semibold rounded-lg shadow-sm shadow-violet-500/20 transition-all active:scale-95 whitespace-nowrap">
+                                        <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> Buka Portal
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Desktop Table -->
+                        <div class="hidden md:block overflow-x-auto">
+                            <table class="w-full text-left border-collapse min-w-[800px]">
+                                <thead>
+                                    <tr class="border-b border-surface-100 bg-surface-50/50">
+                                        <th class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-5 py-3.5">No</th>
+                                        <th class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-5 py-3.5">Nama Caberawit</th>
+                                        <th class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-5 py-3.5">Kelas</th>
+                                        <th class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-5 py-3.5">Periode</th>
+                                        <th class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-5 py-3.5">Kekurangan Materi</th>
+                                        <th class="text-center text-[11px] font-bold text-surface-400 uppercase tracking-wider px-5 py-3.5">Status</th>
+                                        <th class="text-center text-[11px] font-bold text-surface-400 uppercase tracking-wider px-5 py-3.5">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="raport-table-body" class="divide-y divide-surface-100 text-sm">
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="raport-card-list" class="md:hidden divide-y divide-surface-100"></div>
+                        <div id="raport-empty" class="hidden flex-col items-center justify-center py-12 sm:py-16 px-4 text-center">
+                            <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-violet-50 flex items-center justify-center mb-3 sm:mb-4 text-violet-500">
+                                <i class="fa-solid fa-scroll text-2xl sm:text-3xl"></i>
+                            </div>
+                            <h4 class="text-sm sm:text-base font-bold text-surface-800">Belum Ada Data Raport</h4>
+                            <p class="text-[11px] sm:text-xs text-surface-400 max-w-sm mt-1 mb-4 sm:mb-5">Mulai catat kekurangan materi setiap caberawit untuk disampaikan kepada orang tua.</p>
+                            <button onclick="openAddRaportModal()"
+                                class="inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 bg-gradient-to-r from-violet-600 to-violet-700 text-white text-xs font-semibold rounded-xl shadow-lg shadow-violet-500/25 hover:from-violet-700 hover:to-violet-800 transition-all">
+                                <i class="fa-solid fa-plus"></i> Buat Raport Pertama
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ============================
                  SECTION: PENGATURAN
                  ============================ -->
                 <section id="section-pengaturan" class="page-section hidden">
@@ -1891,6 +2059,205 @@ Storage    : absensi-4d9c8.firebasestorage.app</code></pre>
         </div>
     </div>
 
+    <!-- ============================================================
+         MODAL: Tambah / Edit Raport Caberawit
+         ============================================================ -->
+    <div id="modal-raport" class="fixed inset-0 z-50 hidden items-end sm:items-center justify-center sm:p-4">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeModal('modal-raport')"></div>
+        <div class="relative bg-white w-full sm:rounded-2xl sm:max-w-lg shadow-2xl animate-slide-up max-h-[92vh] sm:max-h-[85vh] flex flex-col rounded-t-3xl sm:rounded-t-2xl">
+            <div class="flex items-center justify-between px-5 sm:px-6 pt-5 sm:pt-6 pb-3 border-b border-surface-100 shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center text-white shadow-md">
+                        <i class="fa-solid fa-scroll text-sm"></i>
+                    </div>
+                    <div>
+                        <h3 id="raport-modal-title" class="text-base sm:text-lg font-bold text-surface-900">Tambah Raport</h3>
+                        <p class="text-[10px] sm:text-xs text-surface-400">Catat kekurangan materi caberawit</p>
+                    </div>
+                </div>
+                <button onclick="closeModal('modal-raport')" class="p-2 rounded-xl hover:bg-surface-100 text-surface-400 transition-colors">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div class="overflow-y-auto flex-1 custom-scrollbar">
+                <form id="raport-form" onsubmit="handleSubmitRaport(event)" class="p-5 sm:p-6 space-y-4">
+                    <input type="hidden" id="raport-edit-id" />
+                    <div>
+                        <label class="block text-xs sm:text-sm font-semibold text-surface-700 mb-1.5">
+                            <i class="fa-solid fa-user-graduate text-violet-500 mr-1 text-[10px]"></i>
+                            Nama Caberawit <span class="text-rose-500">*</span>
+                        </label>
+                        <select id="raport-nama" required
+                            class="w-full px-3.5 py-2.5 sm:py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 transition-all">
+                            <option value="">— Pilih Caberawit —</option>
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs sm:text-sm font-semibold text-surface-700 mb-1.5">
+                                <i class="fa-solid fa-users text-violet-500 mr-1 text-[10px]"></i>
+                                Kelas <span class="text-rose-500">*</span>
+                            </label>
+                            <select id="raport-kelas" required
+                                class="w-full px-3 py-2.5 sm:py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 transition-all">
+                                <option value="">— Pilih Kelas —</option>
+                                <option value="Caberawit PAUD/TK">Caberawit PAUD/TK</option>
+                                <option value="Caberawit Ula (SD 1-3)">Caberawit Ula (SD 1-3)</option>
+                                <option value="Caberawit Wustho (SD 4-6)">Caberawit Wustho (SD 4-6)</option>
+                                <option value="Pra-Remaja (SMP)">Pra-Remaja (SMP)</option>
+                                <option value="Remaja (SMA/Kuliah)">Remaja (SMA/Kuliah)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs sm:text-sm font-semibold text-surface-700 mb-1.5">
+                                <i class="fa-solid fa-calendar text-violet-500 mr-1 text-[10px]"></i>
+                                Periode <span class="text-rose-500">*</span>
+                            </label>
+                            <input type="month" id="raport-periode" required
+                                class="w-full px-3 py-2.5 sm:py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 transition-all" />
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs sm:text-sm font-semibold text-surface-700 mb-1.5">
+                            <i class="fa-solid fa-book text-violet-500 mr-1 text-[10px]"></i>
+                            Mata Pelajaran <span class="text-rose-500">*</span>
+                        </label>
+                        <select id="raport-mapel" required
+                            class="w-full px-3 py-2.5 sm:py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 transition-all">
+                            <option value="">— Pilih Mapel —</option>
+                            <option value="Al-Qur'an & Tilawati">Al-Qur'an & Tilawati</option>
+                            <option value="Hadist Himpunan">Hadist Himpunan</option>
+                            <option value="Pegon / Makna Gandul">Pegon / Makna Gandul</option>
+                            <option value="Praktik Ibadah & Sholat">Praktik Ibadah & Sholat</option>
+                            <option value="Hafalan Doa & Asmaul Husna">Hafalan Doa & Asmaul Husna</option>
+                            <option value="Akhlak & Tata Krama">Akhlak & Tata Krama</option>
+                            <option value="Lainnya">Lainnya</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs sm:text-sm font-semibold text-surface-700 mb-1.5">
+                            <i class="fa-solid fa-clipboard-list text-amber-500 mr-1 text-[10px]"></i>
+                            Kekurangan Materi <span class="text-rose-500">*</span>
+                        </label>
+                        <textarea id="raport-kekurangan" rows="3" required
+                            placeholder="Contoh: Belum hafal surat Al-Fatihah dengan tajwid yang benar, perlu latihan makhorijul huruf..."
+                            class="w-full px-3.5 py-2.5 sm:py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 transition-all placeholder:text-surface-400 resize-none"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs sm:text-sm font-semibold text-surface-700 mb-1.5">
+                            <i class="fa-solid fa-lightbulb text-emerald-500 mr-1 text-[10px]"></i>
+                            Saran Perbaikan
+                        </label>
+                        <textarea id="raport-saran" rows="2"
+                            placeholder="Contoh: Mohon dibantu latihan baca Al-Qur'an di rumah setiap ba'da Maghrib..."
+                            class="w-full px-3.5 py-2.5 sm:py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 transition-all placeholder:text-surface-400 resize-none"></textarea>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs sm:text-sm font-semibold text-surface-700 mb-1.5">
+                                <i class="fa-solid fa-star text-amber-500 mr-1 text-[10px]"></i>
+                                Predikat
+                            </label>
+                            <select id="raport-predikat"
+                                class="w-full px-3 py-2.5 sm:py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 transition-all">
+                                <option value="Perlu Bimbingan">Perlu Bimbingan</option>
+                                <option value="Cukup">Cukup</option>
+                                <option value="Baik" selected>Baik</option>
+                                <option value="Sangat Baik">Sangat Baik</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs sm:text-sm font-semibold text-surface-700 mb-1.5">
+                                <i class="fa-solid fa-flag text-violet-500 mr-1 text-[10px]"></i>
+                                Status
+                            </label>
+                            <select id="raport-status"
+                                class="w-full px-3 py-2.5 sm:py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 transition-all">
+                                <option value="Draft">Draft</option>
+                                <option value="Dikirim">Dikirim ke Orang Tua</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs sm:text-sm font-semibold text-surface-700 mb-1.5">
+                            <i class="fa-solid fa-comment-dots text-surface-400 mr-1 text-[10px]"></i>
+                            Catatan Guru (Opsional)
+                        </label>
+                        <textarea id="raport-catatan" rows="2" placeholder="Catatan internal dari guru..."
+                            class="w-full px-3.5 py-2.5 sm:py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 transition-all placeholder:text-surface-400 resize-none"></textarea>
+                    </div>
+                    <button type="submit" id="raport-submit-btn"
+                        class="w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-violet-600 to-violet-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-violet-500/25 hover:from-violet-700 hover:to-violet-800 active:scale-[0.98] transition-all duration-200">
+                        <i class="fa-solid fa-check text-xs"></i> <span id="raport-submit-text">Simpan Raport</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================
+         MODAL: Detail & Cetak Raport Caberawit
+         ============================================================ -->
+    <div id="modal-raport-detail" class="fixed inset-0 z-50 hidden items-end sm:items-center justify-center sm:p-4">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeModal('modal-raport-detail')"></div>
+        <div class="relative bg-white w-full sm:rounded-2xl sm:max-w-xl shadow-2xl animate-slide-up max-h-[92vh] sm:max-h-[85vh] flex flex-col rounded-t-3xl sm:rounded-t-2xl">
+            <div class="flex items-center justify-between px-5 sm:px-6 pt-5 sm:pt-6 pb-3 border-b border-surface-100 shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center text-white shadow-md">
+                        <i class="fa-solid fa-file-invoice text-sm"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base sm:text-lg font-bold text-surface-900">Lembar Raport Caberawit</h3>
+                        <p class="text-[10px] sm:text-xs text-surface-400">Pratinjau, unduh PDF, dan kirim ke orang tua</p>
+                    </div>
+                </div>
+                <button onclick="closeModal('modal-raport-detail')" class="p-2 rounded-xl hover:bg-surface-100 text-surface-400 transition-colors">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div id="raport-detail-content" class="overflow-y-auto flex-1 custom-scrollbar p-5 sm:p-6 space-y-4">
+                <!-- Populated dynamically by JS -->
+            </div>
+            <div class="p-4 sm:p-5 border-t border-surface-100 bg-surface-50/70 flex flex-wrap items-center justify-end gap-2.5 shrink-0 rounded-b-2xl">
+                <button type="button" onclick="closeModal('modal-raport-detail')"
+                    class="px-3.5 py-2 text-xs font-semibold text-surface-600 hover:bg-surface-200/60 rounded-xl transition-all">
+                    Tutup
+                </button>
+                <button type="button" id="btn-detail-wa"
+                    class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-sm shadow-emerald-600/20 active:scale-95 transition-all">
+                    <i class="fa-brands fa-whatsapp text-sm"></i> Kirim ke WA Wali
+                </button>
+                <button type="button" id="btn-detail-download"
+                    class="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-700 hover:to-violet-800 text-white text-xs font-semibold rounded-xl shadow-lg shadow-violet-500/25 active:scale-95 transition-all">
+                    <i class="fa-solid fa-download text-xs"></i> Unduh / Cetak PDF
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================
+         MODAL: Konfirmasi Hapus Raport
+         ============================================================ -->
+    <div id="modal-delete-raport" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeModal('modal-delete-raport')"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 animate-slide-up text-center">
+            <div class="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-4 border border-rose-100 shadow-sm">
+                <i class="fa-solid fa-trash-can text-xl"></i>
+            </div>
+            <h3 class="text-lg font-bold text-surface-900 mb-1.5">Hapus Raport?</h3>
+            <p class="text-xs text-surface-500 mb-6 leading-relaxed">Data raport ini akan dihapus permanen dan tidak dapat dikembalikan.</p>
+            <div class="flex items-center gap-2.5">
+                <button type="button" onclick="closeModal('modal-delete-raport')"
+                    class="flex-1 px-4 py-2.5 bg-surface-100 hover:bg-surface-200 text-surface-700 text-xs font-semibold rounded-xl transition-all">
+                    Batal
+                </button>
+                <button type="button" id="btn-confirm-delete-raport" onclick="executeDeleteRaport()"
+                    class="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl shadow-lg shadow-rose-500/25 active:scale-95 transition-all">
+                    <i class="fa-solid fa-trash-can text-xs"></i> Ya, Hapus
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- ============================================================
          TOAST NOTIFICATION
