@@ -380,4 +380,43 @@
     }
 }
 
+/* ============================================================
+   INTERACTIVE VIDEO TOUR STYLES
+   ============================================================ */
+#tour-spotlight {
+    box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.72), 0 0 35px 8px rgba(244, 63, 94, 0.55);
+    border: 3px solid #f43f5e;
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes tourPulse {
+    0%, 100% {
+        box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.72), 0 0 30px 6px rgba(244, 63, 94, 0.5);
+        border-color: #f43f5e;
+    }
+    50% {
+        box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.72), 0 0 50px 14px rgba(99, 102, 241, 0.75);
+        border-color: #6366f1;
+    }
+}
+
+.tour-pulse-active {
+    animation: tourPulse 2s infinite ease-in-out;
+}
+
+#tour-player-dock {
+    animation: tourDockSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes tourDockSlideUp {
+    from {
+        opacity: 0;
+        transform: translate(-50%, 25px);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
+}
+
 

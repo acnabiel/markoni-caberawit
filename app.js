@@ -101,6 +101,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (qrFileInput) {
         qrFileInput.addEventListener('change', handleQRImageUpload);
     }
+
+    // Check status banner panduan selamat datang
+    const welcomeBanner = document.getElementById('welcome-guide-banner');
+    if (welcomeBanner && localStorage.getItem('tpq_guide_banner_dismissed') === 'true') {
+        welcomeBanner.classList.add('hidden');
+    }
 });
 
 
@@ -1728,6 +1734,356 @@ function closeModal(modalId) {
         modal.classList.add('hidden');
         modal.classList.remove('modal-open');
         document.body.style.overflow = '';
+    }
+}
+
+// -----------------------------------------------
+// PANDUAN PENGGUNA (ONBOARDING GUIDE HELPER)
+// -----------------------------------------------
+function switchGuideTab(tabId) {
+    const tabs = ['alur', 'menu', 'scan', 'faq'];
+    tabs.forEach(tab => {
+        const content = document.getElementById(`guide-tab-content-${tab}`);
+        const btn = document.getElementById(`guide-tab-btn-${tab}`);
+        if (!content || !btn) return;
+
+        if (tab === tabId) {
+            content.classList.remove('hidden');
+            btn.className = 'guide-tab-btn px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all duration-200 bg-primary-600 text-white shadow-sm shadow-primary-500/25 shrink-0 active';
+        } else {
+            content.classList.add('hidden');
+            btn.className = 'guide-tab-btn px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all duration-200 bg-surface-200/60 text-surface-600 hover:bg-surface-200 shrink-0';
+        }
+    });
+}
+
+function dismissWelcomeBanner() {
+    const banner = document.getElementById('welcome-guide-banner');
+    if (banner) {
+        banner.style.transition = 'all 0.3s ease-out';
+        banner.style.opacity = '0';
+        banner.style.transform = 'translateY(-10px)';
+        setTimeout(() => {
+            banner.classList.add('hidden');
+        }, 300);
+    }
+    localStorage.setItem('tpq_guide_banner_dismissed', 'true');
+}
+
+// -----------------------------------------------
+// INTERACTIVE VIDEO TOUR ENGINE (LIVE WALKTHROUGH)
+// -----------------------------------------------
+let isTourRunning = false;
+let currentTourStep = 0;
+let isTourPlaying = true;
+let tourSpeed = 1.0;
+let tourStepElapsed = 0;
+let tourInterval = null;
+let currentTourTargetElem = null;
+
+const TOUR_STEPS = [
+    {
+        page: 'dashboard',
+        targetSelector: '#section-dashboard .stat-card',
+        title: '📊 1. Statistik Kehadiran Real-Time',
+        desc: 'Di sinilah rangkuman harian santri: Hadir, Izin, Sakit, atau Alpa. Angka ini bertambah otomatis setiap ada santri yang melakukan absensi.',
+        duration: 6500,
+        pointerText: '👇 Kartu Statistik Harian'
+    },
+    {
+        page: 'dashboard',
+        targetSelector: '#connection-status-badge',
+        title: '⚡ 2. Status Cloud & Input Cepat',
+        desc: 'Indikator ini memastikan data terhubung ke Firebase. Anda juga bisa mengklik tombol petir "Input Cepat" untuk mencatat kehadiran santri hanya dalam 3 detik!',
+        duration: 6000,
+        pointerText: '👇 Status & Aksi Cepat'
+    },
+    {
+        page: 'dashboard',
+        targetSelector: '#sidebar',
+        title: '🧭 3. Bilah Navigasi Menu',
+        desc: 'Bilah samping adalah pusat modul sistem: Scan QR, Data Caberawit, Rekap Absensi, Jurnal Guru, hingga Raport Santri dapat diakses dari sini kapan saja.',
+        duration: 6000,
+        mobileOpenSidebar: true,
+        pointerText: '👉 Menu Navigasi'
+    },
+    {
+        page: 'karyawan',
+        targetSelector: '#section-karyawan .bg-white',
+        title: '👥 4. Data Caberawit & Cetak Kartu QR',
+        desc: 'Daftarkan nama santri, kelompok kelas, dan WhatsApp orang tua. Klik ikon QR di samping nama santri untuk mencetak atau mengunduh kartu identitas barcode santri!',
+        duration: 7500,
+        pointerText: '👇 Manajemen Santri'
+    },
+    {
+        page: 'scan',
+        targetSelector: '#qr-reader',
+        title: '📷 5. Pemindai QR Absensi Otomatis',
+        desc: 'Saat KBM dimulai, cukup sorot kartu QR santri ke kotak kamera ini. Sistem akan berbunyi "beep" dan otomatis mencatat santri Hadir tanpa perlu mengetik manual!',
+        duration: 7000,
+        pointerText: '👇 Arahkan Kartu ke Sini'
+    },
+    {
+        page: 'rekap',
+        targetSelector: '#section-rekap .bg-white',
+        title: '📋 6. Rekapitulasi Data & Ekspor Excel',
+        desc: 'Seluruh riwayat kehadiran tersimpan rapi. Anda bisa memfilter berdasarkan tanggal, mengubah data jika ada kekeliruan, atau mengekspor laporan ke file Excel (CSV).',
+        duration: 6500,
+        pointerText: '👇 Laporan & Ekspor'
+    },
+    {
+        page: 'jurnal',
+        targetSelector: '#section-jurnal .stat-card, #section-jurnal .bg-white',
+        title: '📖 7. Jurnal Mengajar Guru & KBM Harian',
+        desc: 'Setiap selesai KBM, ustadz/ustadzah dapat mencatat materi yang diajarkan (Tilawati/Iqro, Al-Qur\'an, Doa) beserta kendala belajar santri agar pembelajaran terpantau berkesinambungan.',
+        duration: 7000,
+        pointerText: '👇 Agenda Guru'
+    },
+    {
+        page: 'raport',
+        targetSelector: '#section-raport .stat-card, #section-raport .bg-white',
+        title: '📜 8. Raport Evaluasi & Kirim WhatsApp',
+        desc: 'Evaluasi kekurangan materi santri, unduh raport PDF resmi, atau langsung klik tombol WhatsApp untuk mengirimkan laporan capaian langsung ke nomor HP wali murid!',
+        duration: 7500,
+        pointerText: '👇 Evaluasi & Raport'
+    },
+    {
+        page: 'dashboard',
+        targetSelector: '#section-dashboard',
+        title: '🎉 9. Selesai! Selamat Menggunakan Website',
+        desc: 'Tur antarmuka telah selesai. Anda sekarang sudah memahami seluruh alur kerja sistem TPQ Al-Washiyyah. Putar kembali video tur ini kapan saja dari tombol "Tur Video"!',
+        duration: 5000,
+        pointerText: '⭐ Siap Digunakan!'
+    }
+];
+
+function startInteractiveTour() {
+    isTourRunning = true;
+    currentTourStep = 0;
+    isTourPlaying = true;
+    tourStepElapsed = 0;
+
+    // Tutup modal jika sedang terbuka
+    document.querySelectorAll('.modal-open').forEach(m => {
+        closeModal(m.id);
+    });
+
+    const container = document.getElementById('tour-container');
+    if (container) {
+        container.classList.remove('hidden');
+    }
+
+    renderTourStep();
+    startTourTimer();
+
+    window.addEventListener('resize', handleTourReposition);
+    window.addEventListener('scroll', handleTourReposition, { passive: true });
+}
+
+function stopInteractiveTour() {
+    isTourRunning = false;
+    clearInterval(tourInterval);
+    tourInterval = null;
+
+    const container = document.getElementById('tour-container');
+    if (container) {
+        container.classList.add('hidden');
+    }
+
+    const sidebar = document.getElementById('sidebar');
+    if (window.innerWidth < 1024 && sidebar && !sidebar.classList.contains('-translate-x-full')) {
+        toggleSidebar();
+    }
+
+    window.removeEventListener('resize', handleTourReposition);
+    window.removeEventListener('scroll', handleTourReposition);
+
+    showToast('Tur panduan selesai.', 'info');
+}
+
+function renderTourStep() {
+    if (!isTourRunning) return;
+    const step = TOUR_STEPS[currentTourStep];
+    if (!step) return;
+
+    // Pindah halaman jika diperlukan
+    if (currentPage !== step.page) {
+        navigateTo(step.page);
+    }
+
+    // Tangani drawer sidebar pada smartphone
+    const sidebar = document.getElementById('sidebar');
+    if (window.innerWidth < 1024 && sidebar) {
+        if (step.mobileOpenSidebar && sidebar.classList.contains('-translate-x-full')) {
+            toggleSidebar();
+        } else if (!step.mobileOpenSidebar && !sidebar.classList.contains('-translate-x-full')) {
+            toggleSidebar();
+        }
+    }
+
+    // Update teks panduan
+    const titleEl = document.getElementById('tour-title');
+    const descEl = document.getElementById('tour-desc');
+    const badgeEl = document.getElementById('tour-step-badge');
+    const pointerTextEl = document.querySelector('#tour-pointer-arrow span');
+    const totalTimeEl = document.getElementById('tour-time-total');
+
+    if (titleEl) titleEl.textContent = step.title;
+    if (descEl) descEl.textContent = step.desc;
+    if (badgeEl) badgeEl.textContent = `${currentTourStep + 1} / ${TOUR_STEPS.length}`;
+    if (pointerTextEl && step.pointerText) pointerTextEl.textContent = step.pointerText;
+    if (totalTimeEl) {
+        const sec = Math.round(step.duration / 1000);
+        totalTimeEl.textContent = `00:${sec < 10 ? '0' + sec : sec}`;
+    }
+
+    // Status tombol navigasi tur
+    const prevBtn = document.getElementById('tour-btn-prev');
+    const nextBtn = document.getElementById('tour-btn-next');
+    if (prevBtn) prevBtn.disabled = (currentTourStep === 0);
+    if (nextBtn) {
+        nextBtn.innerHTML = currentTourStep === TOUR_STEPS.length - 1
+            ? '<span>Selesai</span> <i class="fa-solid fa-check text-xs"></i>'
+            : '<span>Berikutnya</span> <i class="fa-solid fa-forward-step text-xs"></i>';
+    }
+
+    // Posisikan spotlight dengan sedikit delay agar DOM telah dirender
+    setTimeout(() => {
+        let target = null;
+        if (step.targetSelector) {
+            target = document.querySelector(step.targetSelector);
+        }
+        currentTourTargetElem = target;
+
+        if (target) {
+            try {
+                target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+            } catch (e) {}
+        }
+        updateTourSpotlight(target);
+    }, 180);
+
+    tourStepElapsed = 0;
+    updateTourProgressUI();
+}
+
+function updateTourSpotlight(targetElem) {
+    const spotlight = document.getElementById('tour-spotlight');
+    const dock = document.getElementById('tour-player-dock');
+    if (!spotlight || !dock) return;
+
+    if (!targetElem) {
+        spotlight.style.width = '240px';
+        spotlight.style.height = '140px';
+        spotlight.style.top = '30%';
+        spotlight.style.left = 'calc(50% - 120px)';
+        dock.style.top = 'auto';
+        dock.style.bottom = '24px';
+        return;
+    }
+
+    const rect = targetElem.getBoundingClientRect();
+    const pad = 10;
+    const top = Math.max(6, rect.top - pad);
+    const left = Math.max(6, rect.left - pad);
+    const width = Math.min(window.innerWidth - left - 6, Math.max(120, rect.width + pad * 2));
+    const height = Math.min(window.innerHeight - top - 6, Math.max(60, rect.height + pad * 2));
+
+    spotlight.style.top = `${top}px`;
+    spotlight.style.left = `${left}px`;
+    spotlight.style.width = `${width}px`;
+    spotlight.style.height = `${height}px`;
+
+    // Pastikan dock kontroler tidak menutupi elemen yang disorot
+    const viewportHeight = window.innerHeight;
+    if (rect.bottom > viewportHeight - 240) {
+        dock.style.bottom = 'auto';
+        dock.style.top = '20px';
+    } else {
+        dock.style.top = 'auto';
+        dock.style.bottom = '24px';
+    }
+}
+
+function handleTourReposition() {
+    if (!isTourRunning) return;
+    updateTourSpotlight(currentTourTargetElem);
+}
+
+function startTourTimer() {
+    clearInterval(tourInterval);
+    tourInterval = setInterval(() => {
+        if (!isTourRunning || !isTourPlaying) return;
+        const step = TOUR_STEPS[currentTourStep];
+        if (!step) return;
+
+        tourStepElapsed += 80 * tourSpeed;
+        updateTourProgressUI();
+
+        if (tourStepElapsed >= step.duration) {
+            if (currentTourStep < TOUR_STEPS.length - 1) {
+                currentTourStep++;
+                renderTourStep();
+            } else {
+                stopInteractiveTour();
+            }
+        }
+    }, 80);
+}
+
+function updateTourProgressUI() {
+    const step = TOUR_STEPS[currentTourStep];
+    if (!step) return;
+
+    const pct = Math.min(100, (tourStepElapsed / step.duration) * 100);
+    const progressBar = document.getElementById('tour-progress-bar');
+    if (progressBar) progressBar.style.width = `${pct}%`;
+
+    const currentSec = Math.floor(tourStepElapsed / 1000);
+    const timeCurrEl = document.getElementById('tour-time-current');
+    if (timeCurrEl) timeCurrEl.textContent = `00:${currentSec < 10 ? '0' + currentSec : currentSec}`;
+}
+
+function toggleTourPlayPause() {
+    isTourPlaying = !isTourPlaying;
+    const icon = document.getElementById('tour-play-icon');
+    const label = document.getElementById('tour-play-label');
+    const statusEl = document.getElementById('tour-auto-status');
+
+    if (isTourPlaying) {
+        if (icon) icon.className = 'fa-solid fa-pause text-xs';
+        if (label) label.textContent = 'Jeda';
+        if (statusEl) statusEl.textContent = 'Auto-Play Berjalan';
+    } else {
+        if (icon) icon.className = 'fa-solid fa-play text-xs';
+        if (label) label.textContent = 'Lanjut Putar';
+        if (statusEl) statusEl.textContent = 'Dijeda (Manual)';
+    }
+}
+
+function toggleTourSpeed() {
+    if (tourSpeed === 1.0) tourSpeed = 1.5;
+    else if (tourSpeed === 1.5) tourSpeed = 2.0;
+    else tourSpeed = 1.0;
+
+    const btn = document.getElementById('tour-speed-btn');
+    if (btn) btn.textContent = `${tourSpeed.toFixed(1)}x Speed`;
+    showToast(`Kecepatan tur diubah ke ${tourSpeed.toFixed(1)}x`, 'info');
+}
+
+function nextTourStep() {
+    if (currentTourStep < TOUR_STEPS.length - 1) {
+        currentTourStep++;
+        renderTourStep();
+    } else {
+        stopInteractiveTour();
+    }
+}
+
+function prevTourStep() {
+    if (currentTourStep > 0) {
+        currentTourStep--;
+        renderTourStep();
     }
 }
 
