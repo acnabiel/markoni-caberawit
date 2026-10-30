@@ -628,19 +628,89 @@
                             </div>
 
                             <form id="attendance-form" onsubmit="handleSubmitAbsensi(event)" class="space-y-5">
-                                <!-- Nama Caberawit -->
+                                <!-- Nama Caberawit (Pilih dari Database / Ketik Mandiri) -->
                                 <div>
-                                    <label for="input-nama" class="block text-sm font-semibold text-surface-700 mb-1.5">
-                                        Nama Caberawit <span class="text-rose-500">*</span>
-                                    </label>
-                                    <div class="relative">
-                                        <i
-                                            class="fa-solid fa-user absolute left-3.5 top-1/2 -translate-y-1/2 text-surface-400 text-sm"></i>
-                                        <input type="text" id="input-nama" name="nama" required list="karyawan-datalist"
-                                            placeholder="Ketik atau pilih nama Caberawit..."
-                                            class="w-full pl-10 pr-4 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 placeholder:text-surface-400" />
-                                        <datalist id="karyawan-datalist"></datalist>
+                                    <div class="flex items-center justify-between mb-2">
+                                        <label class="block text-sm font-semibold text-surface-700">
+                                            Nama Caberawit <span class="text-rose-500">*</span>
+                                        </label>
+                                        <!-- Mode Switcher Tabs -->
+                                        <div class="inline-flex items-center p-0.5 bg-surface-100 rounded-xl border border-surface-200/80 text-xs shadow-inner">
+                                            <button type="button" id="btn-mode-db" onclick="setAbsenInputMode('select')"
+                                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 bg-white text-primary-700 shadow-sm">
+                                                <i class="fa-solid fa-database text-[11px] text-primary-600"></i>
+                                                <span>Dari Database</span>
+                                            </button>
+                                            <button type="button" id="btn-mode-manual" onclick="setAbsenInputMode('manual')"
+                                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 text-surface-500 hover:text-surface-800">
+                                                <i class="fa-solid fa-keyboard text-[11px]"></i>
+                                                <span>Ketik Mandiri</span>
+                                            </button>
+                                        </div>
                                     </div>
+
+                                    <!-- Mode 1: Sediakan Langsung Dari Database Caberawit -->
+                                    <div id="wrapper-db-caberawit" class="space-y-2">
+                                        <div class="relative">
+                                            <i class="fa-solid fa-users absolute left-3.5 top-1/2 -translate-y-1/2 text-primary-500 text-sm pointer-events-none"></i>
+                                            <select id="select-caberawit-absen" onchange="onSelectCaberawitChange(this)"
+                                                class="w-full pl-10 pr-10 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 appearance-none cursor-pointer font-medium text-surface-800 hover:border-primary-400">
+                                                <option value="">-- Memuat data dari database Caberawit... --</option>
+                                            </select>
+                                            <i class="fa-solid fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-surface-400 text-xs pointer-events-none"></i>
+                                        </div>
+                                        <div class="flex items-center justify-between text-xs px-1">
+                                            <span class="inline-flex items-center gap-1.5 text-emerald-600 font-medium text-[11px]">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                                <span id="badge-db-caberawit-count">0 Caberawit terdaftar di database</span>
+                                            </span>
+                                            <button type="button" onclick="setAbsenInputMode('manual')" class="text-[11px] text-primary-600 hover:text-primary-800 hover:underline font-medium inline-flex items-center gap-1">
+                                                <span>Nama belum ada? Ketik mandiri</span>
+                                                <i class="fa-solid fa-arrow-right text-[9px]"></i>
+                                            </button>
+                                        </div>
+                                        <!-- Info card saat murid dari database dipilih -->
+                                        <div id="caberawit-selected-info" class="hidden p-3 rounded-xl bg-primary-50/70 border border-primary-200/60 text-xs text-primary-900 animate-fade-in">
+                                            <div class="flex items-center justify-between">
+                                                <div class="flex items-center gap-2.5">
+                                                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-600 to-primary-700 text-white flex items-center justify-center font-bold text-xs shadow-sm">
+                                                        <span id="selected-info-initials">C</span>
+                                                    </div>
+                                                    <div>
+                                                        <span class="font-bold text-surface-900 block text-sm" id="selected-info-name">-</span>
+                                                        <span class="text-[11px] text-primary-700" id="selected-info-role">Caberawit</span>
+                                                    </div>
+                                                </div>
+                                                <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200/80 inline-flex items-center gap-1">
+                                                    <i class="fa-solid fa-circle-check text-emerald-600"></i> Terpilih dari Database
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Mode 2: Ketik Mandiri -->
+                                    <div id="wrapper-manual-caberawit" class="space-y-2 hidden">
+                                        <div class="relative">
+                                            <i class="fa-solid fa-user-pen absolute left-3.5 top-1/2 -translate-y-1/2 text-primary-500 text-sm"></i>
+                                            <input type="text" id="input-nama-manual" list="karyawan-datalist"
+                                                oninput="onManualInputNamaChange(this.value)"
+                                                placeholder="Ketik nama Caberawit secara mandiri..."
+                                                class="w-full pl-10 pr-4 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 placeholder:text-surface-400 font-medium text-surface-800" />
+                                        </div>
+                                        <div class="flex items-center justify-between text-xs px-1">
+                                            <span class="text-surface-500 text-[11px]">
+                                                <i class="fa-regular fa-keyboard text-surface-400 mr-1"></i> Ketik nama bebas (didukung saran autocomplete)
+                                            </span>
+                                            <button type="button" onclick="setAbsenInputMode('select')" class="text-[11px] text-primary-600 hover:text-primary-800 hover:underline font-medium inline-flex items-center gap-1">
+                                                <i class="fa-solid fa-database text-[9px]"></i>
+                                                <span>Kembali ke pilihan database</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Hidden Input to preserve backward compatibility for #input-nama -->
+                                    <input type="hidden" id="input-nama" name="nama" />
+                                    <datalist id="karyawan-datalist"></datalist>
                                 </div>
 
                                 <!-- Tanggal & Jam -->
@@ -1747,11 +1817,38 @@ Storage    : absensi-4d9c8.firebasestorage.app</code></pre>
             </div>
             <form id="quick-absensi-form" onsubmit="handleQuickSubmitAbsensi(event)" class="space-y-4 mt-4">
                 <div>
-                    <label class="block text-sm font-semibold text-surface-700 mb-1.5">Nama Karyawan <span
-                            class="text-rose-500">*</span></label>
-                    <input type="text" id="quick-nama" required list="karyawan-datalist"
-                        placeholder="Pilih atau ketik nama..."
-                        class="w-full px-4 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200" />
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="block text-sm font-semibold text-surface-700">Nama Caberawit <span class="text-rose-500">*</span></label>
+                        <div class="inline-flex items-center p-0.5 bg-surface-100 rounded-lg border border-surface-200 text-[11px]">
+                            <button type="button" id="quick-btn-mode-db" onclick="setQuickAbsenInputMode('select')"
+                                class="px-2.5 py-1 rounded-md font-semibold bg-white text-primary-700 shadow-sm transition-all">
+                                <i class="fa-solid fa-database text-[10px] mr-1"></i> Database
+                            </button>
+                            <button type="button" id="quick-btn-mode-manual" onclick="setQuickAbsenInputMode('manual')"
+                                class="px-2.5 py-1 rounded-md font-semibold text-surface-500 hover:text-surface-800 transition-all">
+                                <i class="fa-solid fa-keyboard text-[10px] mr-1"></i> Ketik
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="quick-wrapper-db">
+                        <div class="relative">
+                            <select id="quick-select-caberawit" onchange="onQuickSelectCaberawitChange(this)"
+                                class="w-full px-4 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 appearance-none cursor-pointer pr-10 font-medium text-surface-800">
+                                <option value="">-- Pilih Caberawit dari Database --</option>
+                            </select>
+                            <i class="fa-solid fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-surface-400 text-xs pointer-events-none"></i>
+                        </div>
+                    </div>
+                    
+                    <div id="quick-wrapper-manual" class="hidden">
+                        <input type="text" id="quick-nama-manual" list="karyawan-datalist"
+                            oninput="onQuickManualInputNamaChange(this.value)"
+                            placeholder="Ketik nama Caberawit..."
+                            class="w-full px-4 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 font-medium text-surface-800" />
+                    </div>
+
+                    <input type="hidden" id="quick-nama" required />
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
@@ -1803,9 +1900,35 @@ Storage    : absensi-4d9c8.firebasestorage.app</code></pre>
             <form id="edit-form" onsubmit="handleUpdateAbsensi(event)" class="space-y-4">
                 <input type="hidden" id="edit-id" />
                 <div>
-                    <label class="block text-sm font-semibold text-surface-700 mb-1.5">Nama</label>
-                    <input type="text" id="edit-nama" required list="karyawan-datalist"
-                        class="w-full px-4 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200" />
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="block text-sm font-semibold text-surface-700">Nama Caberawit <span class="text-rose-500">*</span></label>
+                        <div class="inline-flex items-center p-0.5 bg-surface-100 rounded-lg border border-surface-200 text-[11px]">
+                            <button type="button" id="edit-btn-mode-db" onclick="setEditAbsenInputMode('select')"
+                                class="px-2.5 py-1 rounded-md font-semibold bg-white text-primary-700 shadow-sm transition-all">
+                                <i class="fa-solid fa-database text-[10px] mr-1"></i> Database
+                            </button>
+                            <button type="button" id="edit-btn-mode-manual" onclick="setEditAbsenInputMode('manual')"
+                                class="px-2.5 py-1 rounded-md font-semibold text-surface-500 hover:text-surface-800 transition-all">
+                                <i class="fa-solid fa-keyboard text-[10px] mr-1"></i> Ketik
+                            </button>
+                        </div>
+                    </div>
+                    <div id="edit-wrapper-db">
+                        <div class="relative">
+                            <select id="edit-select-caberawit" onchange="onEditSelectCaberawitChange(this)"
+                                class="w-full px-4 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 appearance-none cursor-pointer pr-10 font-medium text-surface-800">
+                                <option value="">-- Pilih Caberawit dari Database --</option>
+                            </select>
+                            <i class="fa-solid fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-surface-400 text-xs pointer-events-none"></i>
+                        </div>
+                    </div>
+                    <div id="edit-wrapper-manual" class="hidden">
+                        <input type="text" id="edit-nama-manual" list="karyawan-datalist"
+                            oninput="onEditManualInputNamaChange(this.value)"
+                            placeholder="Ketik nama Caberawit..."
+                            class="w-full px-4 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 font-medium text-surface-800" />
+                    </div>
+                    <input type="hidden" id="edit-nama" required />
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>

@@ -77,6 +77,11 @@ const SCAN_COOLDOWN_MS = 2500;
 let liveClockInterval = null;
 let currentSelectedQRItem = null;
 
+// State untuk Mode Input Nama Caberawit (Database vs Ketik Mandiri)
+let currentAbsenInputMode = 'select'; // 'select' or 'manual'
+let currentQuickAbsenMode = 'select';
+let currentEditAbsenMode = 'select';
+
 
 
 // -----------------------------------------------
@@ -95,6 +100,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Coba hubungkan ke Firebase (Realtime Database atau Firestore)
     connectToFirebase();
+
+    // Setup listener reset form absensi
+    const attForm = document.getElementById('attendance-form');
+    if (attForm) {
+        attForm.addEventListener('reset', () => {
+            setTimeout(() => {
+                resetAbsenFormCaberawit();
+                setDefaultFormDate();
+            }, 50);
+        });
+    }
 
     // Setup input file listener untuk unggah gambar QR fallback
     const qrFileInput = document.getElementById('qr-file-input');
@@ -1072,13 +1088,212 @@ function exportCSV() {
 
 
 // -----------------------------------------------
-// 12. CRUD OPERATIONS — ABSENSI
+// 12. CRUD OPERATIONS — ABSENSI & CABERAWIT INPUT CONTROLLERS
 // -----------------------------------------------
+
+// Helper controller untuk Mode Input Nama Caberawit (Database vs Ketik Mandiri)
+function setAbsenInputMode(mode) {
+    currentAbsenInputMode = mode;
+    const btnDb = document.getElementById('btn-mode-db');
+    const btnManual = document.getElementById('btn-mode-manual');
+    const wrapDb = document.getElementById('wrapper-db-caberawit');
+    const wrapManual = document.getElementById('wrapper-manual-caberawit');
+    const selectEl = document.getElementById('select-caberawit-absen');
+    const manualInput = document.getElementById('input-nama-manual');
+    const hiddenNama = document.getElementById('input-nama');
+
+    if (mode === 'select') {
+        if (btnDb) {
+            btnDb.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 bg-white text-primary-700 shadow-sm';
+        }
+        if (btnManual) {
+            btnManual.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 text-surface-500 hover:text-surface-800';
+        }
+        if (wrapDb) wrapDb.classList.remove('hidden');
+        if (wrapManual) wrapManual.classList.add('hidden');
+        if (hiddenNama && selectEl) {
+            hiddenNama.value = (selectEl.value === '__manual__') ? '' : selectEl.value;
+        }
+    } else {
+        if (btnDb) {
+            btnDb.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 text-surface-500 hover:text-surface-800';
+        }
+        if (btnManual) {
+            btnManual.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 bg-white text-primary-700 shadow-sm';
+        }
+        if (wrapDb) wrapDb.classList.add('hidden');
+        if (wrapManual) wrapManual.classList.remove('hidden');
+        if (hiddenNama && manualInput) {
+            hiddenNama.value = manualInput.value.trim();
+        }
+        if (manualInput) {
+            setTimeout(() => manualInput.focus(), 50);
+        }
+    }
+}
+
+function onSelectCaberawitChange(selectEl) {
+    if (!selectEl) return;
+    const val = selectEl.value;
+    const hiddenNama = document.getElementById('input-nama');
+    const infoCard = document.getElementById('caberawit-selected-info');
+    const nameEl = document.getElementById('selected-info-name');
+    const roleEl = document.getElementById('selected-info-role');
+    const initialsEl = document.getElementById('selected-info-initials');
+
+    if (val === '__manual__') {
+        selectEl.value = '';
+        if (hiddenNama) hiddenNama.value = '';
+        if (infoCard) infoCard.classList.add('hidden');
+        setAbsenInputMode('manual');
+        return;
+    }
+
+    if (hiddenNama) hiddenNama.value = val;
+
+    if (val) {
+        const item = allKaryawanData.find(k => k.nama === val);
+        if (infoCard) {
+            infoCard.classList.remove('hidden');
+            if (nameEl) nameEl.textContent = val;
+            if (roleEl) roleEl.textContent = (item && item.jabatan) ? item.jabatan : 'Caberawit';
+            if (initialsEl) initialsEl.textContent = val.charAt(0).toUpperCase();
+        }
+    } else {
+        if (infoCard) infoCard.classList.add('hidden');
+    }
+}
+
+function onManualInputNamaChange(val) {
+    const hiddenNama = document.getElementById('input-nama');
+    if (hiddenNama) hiddenNama.value = (val || '').trim();
+}
+
+function resetAbsenFormCaberawit() {
+    const selectEl = document.getElementById('select-caberawit-absen');
+    const manualInput = document.getElementById('input-nama-manual');
+    const hiddenNama = document.getElementById('input-nama');
+    const infoCard = document.getElementById('caberawit-selected-info');
+
+    if (selectEl) selectEl.value = '';
+    if (manualInput) manualInput.value = '';
+    if (hiddenNama) hiddenNama.value = '';
+    if (infoCard) infoCard.classList.add('hidden');
+
+    if (allKaryawanData && allKaryawanData.length > 0) {
+        setAbsenInputMode('select');
+    } else {
+        setAbsenInputMode('manual');
+    }
+}
+
+// Controller Modal Quick Absensi
+function setQuickAbsenInputMode(mode) {
+    currentQuickAbsenMode = mode;
+    const btnDb = document.getElementById('quick-btn-mode-db');
+    const btnManual = document.getElementById('quick-btn-mode-manual');
+    const wrapDb = document.getElementById('quick-wrapper-db');
+    const wrapManual = document.getElementById('quick-wrapper-manual');
+    const selectEl = document.getElementById('quick-select-caberawit');
+    const manualInput = document.getElementById('quick-nama-manual');
+    const hiddenNama = document.getElementById('quick-nama');
+
+    if (mode === 'select') {
+        if (btnDb) btnDb.className = 'px-2.5 py-1 rounded-md font-semibold bg-white text-primary-700 shadow-sm transition-all';
+        if (btnManual) btnManual.className = 'px-2.5 py-1 rounded-md font-semibold text-surface-500 hover:text-surface-800 transition-all';
+        if (wrapDb) wrapDb.classList.remove('hidden');
+        if (wrapManual) wrapManual.classList.add('hidden');
+        if (hiddenNama && selectEl) hiddenNama.value = (selectEl.value === '__manual__') ? '' : selectEl.value;
+    } else {
+        if (btnDb) btnDb.className = 'px-2.5 py-1 rounded-md font-semibold text-surface-500 hover:text-surface-800 transition-all';
+        if (btnManual) btnManual.className = 'px-2.5 py-1 rounded-md font-semibold bg-white text-primary-700 shadow-sm transition-all';
+        if (wrapDb) wrapDb.classList.add('hidden');
+        if (wrapManual) wrapManual.classList.remove('hidden');
+        if (hiddenNama && manualInput) hiddenNama.value = manualInput.value.trim();
+        if (manualInput) setTimeout(() => manualInput.focus(), 50);
+    }
+}
+
+function onQuickSelectCaberawitChange(selectEl) {
+    if (!selectEl) return;
+    const val = selectEl.value;
+    const hiddenNama = document.getElementById('quick-nama');
+    if (val === '__manual__') {
+        selectEl.value = '';
+        if (hiddenNama) hiddenNama.value = '';
+        setQuickAbsenInputMode('manual');
+        return;
+    }
+    if (hiddenNama) hiddenNama.value = val;
+}
+
+function onQuickManualInputNamaChange(val) {
+    const hiddenNama = document.getElementById('quick-nama');
+    if (hiddenNama) hiddenNama.value = (val || '').trim();
+}
+
+// Controller Modal Edit Absensi
+function setEditAbsenInputMode(mode) {
+    currentEditAbsenMode = mode;
+    const btnDb = document.getElementById('edit-btn-mode-db');
+    const btnManual = document.getElementById('edit-btn-mode-manual');
+    const wrapDb = document.getElementById('edit-wrapper-db');
+    const wrapManual = document.getElementById('edit-wrapper-manual');
+    const selectEl = document.getElementById('edit-select-caberawit');
+    const manualInput = document.getElementById('edit-nama-manual');
+    const hiddenNama = document.getElementById('edit-nama');
+
+    if (mode === 'select') {
+        if (btnDb) btnDb.className = 'px-2.5 py-1 rounded-md font-semibold bg-white text-primary-700 shadow-sm transition-all';
+        if (btnManual) btnManual.className = 'px-2.5 py-1 rounded-md font-semibold text-surface-500 hover:text-surface-800 transition-all';
+        if (wrapDb) wrapDb.classList.remove('hidden');
+        if (wrapManual) wrapManual.classList.add('hidden');
+        if (hiddenNama && selectEl) hiddenNama.value = (selectEl.value === '__manual__') ? '' : selectEl.value;
+    } else {
+        if (btnDb) btnDb.className = 'px-2.5 py-1 rounded-md font-semibold text-surface-500 hover:text-surface-800 transition-all';
+        if (btnManual) btnManual.className = 'px-2.5 py-1 rounded-md font-semibold bg-white text-primary-700 shadow-sm transition-all';
+        if (wrapDb) wrapDb.classList.add('hidden');
+        if (wrapManual) wrapManual.classList.remove('hidden');
+        if (hiddenNama && manualInput) hiddenNama.value = manualInput.value.trim();
+        if (manualInput) setTimeout(() => manualInput.focus(), 50);
+    }
+}
+
+function onEditSelectCaberawitChange(selectEl) {
+    if (!selectEl) return;
+    const val = selectEl.value;
+    const hiddenNama = document.getElementById('edit-nama');
+    if (val === '__manual__') {
+        selectEl.value = '';
+        if (hiddenNama) hiddenNama.value = '';
+        setEditAbsenInputMode('manual');
+        return;
+    }
+    if (hiddenNama) hiddenNama.value = val;
+}
+
+function onEditManualInputNamaChange(val) {
+    const hiddenNama = document.getElementById('edit-nama');
+    if (hiddenNama) hiddenNama.value = (val || '').trim();
+}
 
 async function handleSubmitAbsensi(event) {
     event.preventDefault();
 
-    const nama = document.getElementById('input-nama').value.trim();
+    let nama = document.getElementById('input-nama') ? document.getElementById('input-nama').value.trim() : '';
+    // Jika input-nama belum terisi, coba ambil dari elemen yang sedang aktif
+    if (!nama) {
+        if (currentAbsenInputMode === 'select') {
+            const selectEl = document.getElementById('select-caberawit-absen');
+            if (selectEl && selectEl.value && selectEl.value !== '__manual__') {
+                nama = selectEl.value.trim();
+            }
+        } else {
+            const manualEl = document.getElementById('input-nama-manual');
+            if (manualEl) nama = manualEl.value.trim();
+        }
+    }
+
     const tanggal = document.getElementById('input-tanggal').value;
     const jam = document.getElementById('input-jam').value;
     const status = document.getElementById('input-status').value;
@@ -1117,6 +1332,7 @@ async function handleSubmitAbsensi(event) {
     updateChartData();
 
     document.getElementById('attendance-form').reset();
+    resetAbsenFormCaberawit();
     setDefaultFormDate();
 
     showToast(`Absensi ${nama} (${status}) berhasil disimpan!`, 'success');
@@ -1126,7 +1342,17 @@ async function handleSubmitAbsensi(event) {
 async function handleQuickSubmitAbsensi(event) {
     event.preventDefault();
 
-    const nama = document.getElementById('quick-nama').value.trim();
+    let nama = document.getElementById('quick-nama') ? document.getElementById('quick-nama').value.trim() : '';
+    if (!nama) {
+        if (currentQuickAbsenMode === 'select') {
+            const qSelect = document.getElementById('quick-select-caberawit');
+            if (qSelect && qSelect.value && qSelect.value !== '__manual__') nama = qSelect.value.trim();
+        } else {
+            const qManual = document.getElementById('quick-nama-manual');
+            if (qManual) nama = qManual.value.trim();
+        }
+    }
+
     const tanggal = document.getElementById('quick-tanggal').value;
     const jam = document.getElementById('quick-jam').value;
     const status = document.getElementById('quick-status').value;
@@ -1172,10 +1398,20 @@ function openQuickAddModal() {
     const dateInput = document.getElementById('quick-tanggal');
     const timeInput = document.getElementById('quick-jam');
     const nameInput = document.getElementById('quick-nama');
+    const qSelect = document.getElementById('quick-select-caberawit');
+    const qManual = document.getElementById('quick-nama-manual');
 
     if (dateInput) dateInput.value = formatDateISO(today);
     if (timeInput) timeInput.value = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}`;
     if (nameInput) nameInput.value = '';
+    if (qSelect) qSelect.value = '';
+    if (qManual) qManual.value = '';
+
+    if (allKaryawanData && allKaryawanData.length > 0) {
+        setQuickAbsenInputMode('select');
+    } else {
+        setQuickAbsenInputMode('manual');
+    }
 
     openModal('modal-quick-absensi');
 }
@@ -1192,6 +1428,18 @@ function openEditModal(id) {
     const ketEl = document.getElementById('edit-keterangan');
     if (ketEl) ketEl.value = item.keterangan || '';
 
+    const editSelect = document.getElementById('edit-select-caberawit');
+    const editManual = document.getElementById('edit-nama-manual');
+    const isFoundInDb = allKaryawanData.some(k => k.nama === item.nama);
+
+    if (isFoundInDb && editSelect) {
+        setEditAbsenInputMode('select');
+        editSelect.value = item.nama;
+    } else {
+        setEditAbsenInputMode('manual');
+        if (editManual) editManual.value = item.nama;
+    }
+
     openModal('modal-edit');
 }
 
@@ -1199,8 +1447,19 @@ async function handleUpdateAbsensi(event) {
     event.preventDefault();
 
     const id = document.getElementById('edit-id').value;
+    let nama = document.getElementById('edit-nama') ? document.getElementById('edit-nama').value.trim() : '';
+    if (!nama) {
+        if (currentEditAbsenMode === 'select') {
+            const eSelect = document.getElementById('edit-select-caberawit');
+            if (eSelect && eSelect.value && eSelect.value !== '__manual__') nama = eSelect.value.trim();
+        } else {
+            const eManual = document.getElementById('edit-nama-manual');
+            if (eManual) nama = eManual.value.trim();
+        }
+    }
+
     const updatedData = {
-        nama: document.getElementById('edit-nama').value.trim(),
+        nama: nama,
         tanggal: document.getElementById('edit-tanggal').value,
         jam: document.getElementById('edit-jam').value,
         status: document.getElementById('edit-status').value,
@@ -1468,9 +1727,75 @@ function filterKaryawanTable(query) {
 }
 
 function updateKaryawanDatalist() {
+    // 1. Datalist untuk autocomplete input mandiri
     const datalist = document.getElementById('karyawan-datalist');
-    if (!datalist) return;
-    datalist.innerHTML = allKaryawanData.map(k => `<option value="${escapeHtml(k.nama)}">${escapeHtml(k.jabatan || '')}</option>`).join('');
+    if (datalist) {
+        datalist.innerHTML = allKaryawanData.map(k => `<option value="${escapeHtml(k.nama)}">${escapeHtml(k.jabatan || '')}</option>`).join('');
+    }
+
+    // 2. Dropdown Select di Form Input Absensi Baru (Ambil langsung dari database Caberawit)
+    const selectAbsen = document.getElementById('select-caberawit-absen');
+    const badgeCount = document.getElementById('badge-db-caberawit-count');
+    if (badgeCount) {
+        badgeCount.textContent = `${allKaryawanData.length} Caberawit terdaftar di database`;
+    }
+
+    if (selectAbsen) {
+        const currentVal = selectAbsen.value;
+        if (allKaryawanData.length === 0) {
+            selectAbsen.innerHTML = '<option value="">-- Belum ada data Caberawit di database --</option>';
+            setAbsenInputMode('manual');
+        } else {
+            let optionsHtml = `<option value="">-- Pilih Nama Caberawit (${allKaryawanData.length} terdaftar) --</option>`;
+            allKaryawanData.forEach(k => {
+                const roleBadge = k.jabatan ? ` (${escapeHtml(k.jabatan)})` : '';
+                optionsHtml += `<option value="${escapeHtml(k.nama)}">${escapeHtml(k.nama)}${roleBadge}</option>`;
+            });
+            optionsHtml += '<option value="__manual__">✏️ + Ketik Nama Mandiri Lainnya...</option>';
+            selectAbsen.innerHTML = optionsHtml;
+
+            if (currentVal && allKaryawanData.some(k => k.nama === currentVal)) {
+                selectAbsen.value = currentVal;
+            }
+        }
+    }
+
+    // 3. Dropdown Select di Modal Quick Absensi
+    const quickSelect = document.getElementById('quick-select-caberawit');
+    if (quickSelect) {
+        const qVal = quickSelect.value;
+        if (allKaryawanData.length === 0) {
+            quickSelect.innerHTML = '<option value="">-- Belum ada data Caberawit --</option>';
+            setQuickAbsenInputMode('manual');
+        } else {
+            let qHtml = `<option value="">-- Pilih Nama Caberawit (${allKaryawanData.length} anak) --</option>`;
+            allKaryawanData.forEach(k => {
+                const roleBadge = k.jabatan ? ` (${escapeHtml(k.jabatan)})` : '';
+                qHtml += `<option value="${escapeHtml(k.nama)}">${escapeHtml(k.nama)}${roleBadge}</option>`;
+            });
+            qHtml += '<option value="__manual__">✏️ + Ketik Nama Mandiri...</option>';
+            quickSelect.innerHTML = qHtml;
+            if (qVal && allKaryawanData.some(k => k.nama === qVal)) {
+                quickSelect.value = qVal;
+            }
+        }
+    }
+
+    // 4. Dropdown Select di Modal Edit Absensi
+    const editSelect = document.getElementById('edit-select-caberawit');
+    if (editSelect) {
+        const eVal = editSelect.value;
+        let eHtml = `<option value="">-- Pilih Nama Caberawit dari Database --</option>`;
+        allKaryawanData.forEach(k => {
+            const roleBadge = k.jabatan ? ` (${escapeHtml(k.jabatan)})` : '';
+            eHtml += `<option value="${escapeHtml(k.nama)}">${escapeHtml(k.nama)}${roleBadge}</option>`;
+        });
+        eHtml += '<option value="__manual__">✏️ + Ketik Nama Mandiri...</option>';
+        editSelect.innerHTML = eHtml;
+        if (eVal && allKaryawanData.some(k => k.nama === eVal)) {
+            editSelect.value = eVal;
+        }
+    }
 }
 
 function showAddKaryawanModal() {
