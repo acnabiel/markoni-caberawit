@@ -82,6 +82,12 @@ let currentAbsenInputMode = 'select'; // 'select' or 'manual'
 let currentQuickAbsenMode = 'select';
 let currentEditAbsenMode = 'select';
 
+// Submission guards anti double-click / spam submit
+let isSubmittingAbsensi = false;
+let isSubmittingQuickAbsensi = false;
+let isSubmittingJurnal = false;
+let isSubmittingRaport = false;
+
 
 
 // -----------------------------------------------
@@ -247,24 +253,137 @@ async function testFirebaseConnection() {
 
 
 // -----------------------------------------------
-// 5. REALTIME LISTENERS (RTDB & FIRESTORE)
+// 5. GLOBAL DEDUPLICATION ENGINE (ANTI-DUPLIKAT)
+// -----------------------------------------------
+
+// 1. Deduplikasi Absensi: 1 murid hanya boleh memiliki 1 record absensi per tanggal
+function deduplicateAbsensiList(rawList) {
+    if (!rawList || !Array.isArray(rawList)) return { uniqueList: [], duplicateIds: [] };
+    const seenMap = new Map();
+    const duplicateIds = [];
+
+    // Urutkan berdasarkan timestamp terbaru lebih dahulu
+    const sorted = [...rawList].sort((a, b) => {
+        const tA = Number(a.timestamp) || new Date(`${a.tanggal} ${a.jam || '00:00'}`).getTime() || 0;
+        const tB = Number(b.timestamp) || new Date(`${b.tanggal} ${b.jam || '00:00'}`).getTime() || 0;
+        return tB - tA;
+    });
+
+    sorted.forEach(item => {
+        const cleanName = (item.nama || '').trim().toLowerCase();
+        const cleanDate = (item.tanggal || '').trim();
+        if (!cleanName || !cleanDate) return;
+
+        const key = `${cleanName}_${cleanDate}`;
+        if (!seenMap.has(key)) {
+            seenMap.set(key, item);
+        } else {
+            if (item.id) duplicateIds.push(item.id);
+        }
+    });
+
+    return { uniqueList: Array.from(seenMap.values()), duplicateIds };
+}
+
+// 2. Deduplikasi Caberawit: nama tidak boleh duplikat (case-insensitive)
+function deduplicateKaryawanList(rawList) {
+    if (!rawList || !Array.isArray(rawList)) return { uniqueList: [], duplicateIds: [] };
+    const seenMap = new Map();
+    const duplicateIds = [];
+
+    rawList.forEach(item => {
+        const cleanName = (item.nama || '').trim().toLowerCase();
+        if (!cleanName) return;
+
+        if (!seenMap.has(cleanName)) {
+            seenMap.set(cleanName, item);
+        } else {
+            if (item.id) duplicateIds.push(item.id);
+        }
+    });
+
+    const uniqueList = Array.from(seenMap.values());
+    uniqueList.sort((a, b) => (a.nama || '').localeCompare(b.nama || ''));
+    return { uniqueList, duplicateIds };
+}
+
+// 3. Deduplikasi Jurnal KBM: guru + tanggal + jam + kelas + mapel
+function deduplicateJurnalList(rawList) {
+    if (!rawList || !Array.isArray(rawList)) return { uniqueList: [], duplicateIds: [] };
+    const seenMap = new Map();
+    const duplicateIds = [];
+
+    const sorted = [...rawList].sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
+
+    sorted.forEach(item => {
+        const cleanGuru = (item.guru || '').trim().toLowerCase();
+        const cleanDate = (item.tanggal || '').trim();
+        const cleanJam = (item.jam || '').trim();
+        const cleanKelas = (item.kelas || '').trim().toLowerCase();
+        const cleanMapel = (item.mapel || '').trim().toLowerCase();
+        if (!cleanGuru || !cleanDate) return;
+
+        const key = `${cleanGuru}_${cleanDate}_${cleanJam}_${cleanKelas}_${cleanMapel}`;
+        if (!seenMap.has(key)) {
+            seenMap.set(key, item);
+        } else {
+            if (item.id) duplicateIds.push(item.id);
+        }
+    });
+
+    return { uniqueList: Array.from(seenMap.values()), duplicateIds };
+}
+
+// 4. Deduplikasi Raport: nama + periode + mapel
+function deduplicateRaportList(rawList) {
+    if (!rawList || !Array.isArray(rawList)) return { uniqueList: [], duplicateIds: [] };
+    const seenMap = new Map();
+    const duplicateIds = [];
+
+    const sorted = [...rawList].sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
+
+    sorted.forEach(item => {
+        const cleanNama = (item.nama || '').trim().toLowerCase();
+        const cleanPeriode = (item.periode || '').trim().toLowerCase();
+        const cleanMapel = (item.mapel || '').trim().toLowerCase();
+        if (!cleanNama) return;
+
+        const key = `${cleanNama}_${cleanPeriode}_${cleanMapel}`;
+        if (!seenMap.has(key)) {
+            seenMap.set(key, item);
+        } else {
+            if (item.id) duplicateIds.push(item.id);
+        }
+    });
+
+    return { uniqueList: Array.from(seenMap.values()), duplicateIds };
+}
+
+
+// -----------------------------------------------
+// 6. REALTIME LISTENERS (RTDB & FIRESTORE)
 // -----------------------------------------------
 
 function setupRealtimeDbListeners() {
     if (!rtdb) return;
 
-    // Absensi listener
+    // 1. Absensi listener dengan auto-deduplikasi
     rtdb.ref('absensi').on('value', (snapshot) => {
         const val = snapshot.val();
         if (val) {
-            allAbsensiData = Object.entries(val)
+            const rawList = Object.entries(val)
                 .map(([id, item]) => ({ id, ...item }))
                 .filter(item => !isDemoRecord(item));
-            allAbsensiData.sort((a, b) => {
-                const tA = Number(a.timestamp) || new Date(`${a.tanggal} ${a.jam || '00:00'}`).getTime() || 0;
-                const tB = Number(b.timestamp) || new Date(`${b.tanggal} ${b.jam || '00:00'}`).getTime() || 0;
-                return tB - tA;
-            });
+
+            const { uniqueList, duplicateIds } = deduplicateAbsensiList(rawList);
+            allAbsensiData = uniqueList;
+
+            // Hapus otomatis sisa data duplikat di Firebase RTDB
+            if (duplicateIds.length > 0 && rtdb) {
+                duplicateIds.forEach(dupId => {
+                    rtdb.ref(`absensi/${dupId}`).remove().catch(() => {});
+                });
+            }
         } else {
             allAbsensiData = [];
         }
@@ -276,7 +395,7 @@ function setupRealtimeDbListeners() {
         if (currentPage === 'rekap') filterRekapData();
     });
 
-    // Karyawan / Caberawit listener
+    // 2. Karyawan / Caberawit listener dengan auto-deduplikasi
     rtdb.ref('karyawan').on('value', (snapshot) => {
         const val = snapshot.val();
         if (val) {
@@ -284,31 +403,15 @@ function setupRealtimeDbListeners() {
                 .map(([id, item]) => ({ id, ...item }))
                 .filter(item => !isDemoRecord(item));
 
-            // Deduplikasi berdasarkan nama peserta (hindari duplikat)
-            const seenNames = new Set();
-            const uniqueList = [];
-            const duplicateIdsToDelete = [];
+            const { uniqueList, duplicateIds } = deduplicateKaryawanList(rawList);
+            allKaryawanData = uniqueList;
 
-            rawList.forEach(item => {
-                const cleanName = (item.nama || '').trim().toLowerCase();
-                if (!cleanName) return;
-                if (!seenNames.has(cleanName)) {
-                    seenNames.add(cleanName);
-                    uniqueList.push(item);
-                } else {
-                    duplicateIdsToDelete.push(item.id);
-                }
-            });
-
-            // Hapus duplikat dari Firebase jika ada
-            if (duplicateIdsToDelete.length > 0 && rtdb) {
-                duplicateIdsToDelete.forEach(dupId => {
+            // Hapus otomatis sisa data duplikat di Firebase RTDB
+            if (duplicateIds.length > 0 && rtdb) {
+                duplicateIds.forEach(dupId => {
                     rtdb.ref(`karyawan/${dupId}`).remove().catch(() => {});
                 });
             }
-
-            allKaryawanData = uniqueList;
-            allKaryawanData.sort((a, b) => (a.nama || '').localeCompare(b.nama || ''));
         } else {
             allKaryawanData = [];
         }
@@ -323,16 +426,23 @@ function setupRealtimeDbListeners() {
 function setupFirestoreListeners() {
     if (!db) return;
 
+    // 1. Absensi listener dengan auto-deduplikasi
     db.collection('absensi').onSnapshot((snapshot) => {
         if (!snapshot.empty) {
-            allAbsensiData = [];
+            const rawList = [];
             snapshot.forEach(doc => {
                 const item = { id: doc.id, ...doc.data() };
-                if (!isDemoRecord(item)) {
-                    allAbsensiData.push(item);
-                }
+                if (!isDemoRecord(item)) rawList.push(item);
             });
-            allAbsensiData.sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
+
+            const { uniqueList, duplicateIds } = deduplicateAbsensiList(rawList);
+            allAbsensiData = uniqueList;
+
+            if (duplicateIds.length > 0 && db) {
+                duplicateIds.forEach(dupId => {
+                    db.collection('absensi').doc(dupId).delete().catch(() => {});
+                });
+            }
         } else {
             allAbsensiData = [];
         }
@@ -344,40 +454,23 @@ function setupFirestoreListeners() {
         if (currentPage === 'rekap') filterRekapData();
     });
 
+    // 2. Karyawan / Caberawit listener dengan auto-deduplikasi
     db.collection('karyawan').onSnapshot((snapshot) => {
         if (!snapshot.empty) {
             const rawList = [];
             snapshot.forEach(doc => {
                 const item = { id: doc.id, ...doc.data() };
-                if (!isDemoRecord(item)) {
-                    rawList.push(item);
-                }
+                if (!isDemoRecord(item)) rawList.push(item);
             });
 
-            // Deduplikasi berdasarkan nama peserta
-            const seenNames = new Set();
-            const uniqueList = [];
-            const duplicateIdsToDelete = [];
+            const { uniqueList, duplicateIds } = deduplicateKaryawanList(rawList);
+            allKaryawanData = uniqueList;
 
-            rawList.forEach(item => {
-                const cleanName = (item.nama || '').trim().toLowerCase();
-                if (!cleanName) return;
-                if (!seenNames.has(cleanName)) {
-                    seenNames.add(cleanName);
-                    uniqueList.push(item);
-                } else {
-                    duplicateIdsToDelete.push(item.id);
-                }
-            });
-
-            if (duplicateIdsToDelete.length > 0 && db) {
-                duplicateIdsToDelete.forEach(dupId => {
+            if (duplicateIds.length > 0 && db) {
+                duplicateIds.forEach(dupId => {
                     db.collection('karyawan').doc(dupId).delete().catch(() => {});
                 });
             }
-
-            allKaryawanData = uniqueList;
-            allKaryawanData.sort((a, b) => (a.nama || '').localeCompare(b.nama || ''));
         } else {
             allKaryawanData = [];
         }
