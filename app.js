@@ -89,6 +89,215 @@ let isSubmittingJurnal = false;
 let isSubmittingRaport = false;
 
 
+// ----------------------------------------------------
+// 2.5 LIVEWIRE REACTIVE ENGINE (No Full-Page Reload)
+// ----------------------------------------------------
+const LivewireEngine = {
+    highlightedRowIds: new Set(),
+    debounceTimers: {},
+
+    // Indikator loading shimmer bar per tabel
+    startLoading(componentName) {
+        const bar = document.getElementById(`livewire-bar-${componentName}`);
+        if (bar) bar.classList.add('active');
+        const icon = document.getElementById(`livewire-icon-${componentName}`);
+        if (icon) icon.classList.add('fa-spin');
+    },
+
+    stopLoading(componentName, delay = 350) {
+        setTimeout(() => {
+            const bar = document.getElementById(`livewire-bar-${componentName}`);
+            if (bar) bar.classList.remove('active');
+            const icon = document.getElementById(`livewire-icon-${componentName}`);
+            if (icon) icon.classList.remove('fa-spin');
+        }, delay);
+    },
+
+    // Flash highlight baris data baru / data yang baru diedit
+    highlightRow(id, duration = 2800) {
+        if (!id) return;
+        const strId = String(id);
+        this.highlightedRowIds.add(strId);
+
+        // Langsung tambahkan class ke elemen yang sudah ter-render jika ada
+        const nodes = document.querySelectorAll(`[data-livewire-id="${strId}"]`);
+        nodes.forEach(el => el.classList.add('livewire-row-highlight'));
+
+        setTimeout(() => {
+            this.highlightedRowIds.delete(strId);
+            const activeNodes = document.querySelectorAll(`[data-livewire-id="${strId}"]`);
+            activeNodes.forEach(el => el.classList.remove('livewire-row-highlight'));
+        }, duration);
+    },
+
+    isHighlighted(id) {
+        if (!id) return false;
+        return this.highlightedRowIds.has(String(id));
+    },
+
+    // Animasi baris keluar sebelum dihapus dari DOM
+    async animateRowDelete(selectorOrElements) {
+        try {
+            const elements = typeof selectorOrElements === 'string'
+                ? document.querySelectorAll(selectorOrElements)
+                : (selectorOrElements instanceof NodeList || Array.isArray(selectorOrElements) ? selectorOrElements : [selectorOrElements]);
+
+            if (!elements || elements.length === 0) return;
+            elements.forEach(el => {
+                if (el && el.classList) el.classList.add('livewire-row-delete');
+            });
+            await new Promise(resolve => setTimeout(resolve, 360));
+        } catch (e) {
+            console.warn('Livewire animateRowDelete error:', e);
+        }
+    },
+
+    // Debounce reaktif untuk input pencarian (mirip wire:model.debounce)
+    debounce(key, fn, delay = 220) {
+        if (this.debounceTimers[key]) {
+            clearTimeout(this.debounceTimers[key]);
+        }
+        this.debounceTimers[key] = setTimeout(() => {
+            fn();
+            delete this.debounceTimers[key];
+        }, delay);
+    },
+
+    // Refresh tabel spesifik tanpa reload halaman
+    refresh(componentName, highlightId = null, action = 'refresh') {
+        this.startLoading(componentName);
+
+        if (highlightId && (action === 'create' || action === 'update')) {
+            this.highlightRow(highlightId);
+        }
+
+        try {
+            switch (componentName) {
+                case 'dashboard-absensi':
+                    renderAttendanceTable();
+                    updateStatCards();
+                    updateChartData();
+                    break;
+                case 'absensi-preview':
+                    renderInputAbsensiPreviewTable();
+                    break;
+                case 'rekap':
+                    filterRekapData();
+                    break;
+                case 'karyawan':
+                    renderKaryawanTable(allKaryawanData);
+                    break;
+                case 'jurnal':
+                    renderJurnalData();
+                    break;
+                case 'raport':
+                    renderRaportData();
+                    break;
+                default:
+                    console.warn(`Unknown Livewire component: ${componentName}`);
+            }
+        } finally {
+            this.stopLoading(componentName);
+        }
+    }
+};
+
+// Preview Absensi State & Functions
+let currentAbsensiPreviewFilter = 'semua';
+
+function setAbsensiPreviewFilter(status) {
+    currentAbsensiPreviewFilter = status;
+    const filterButtons = {
+        'semua': 'btn-prev-filter-semua',
+        'Hadir': 'btn-prev-filter-hadir',
+        'Izin': 'btn-prev-filter-izin',
+        'Sakit': 'btn-prev-filter-sakit',
+        'Alpa': 'btn-prev-filter-alpa'
+    };
+
+    Object.entries(filterButtons).forEach(([key, btnId]) => {
+        const btn = document.getElementById(btnId);
+        if (!btn) return;
+        if (key.toLowerCase() === status.toLowerCase()) {
+            btn.className = 'prev-filter-btn px-2.5 py-1 rounded-lg bg-primary-600 text-white border border-primary-600';
+        } else {
+            btn.className = 'prev-filter-btn px-2.5 py-1 rounded-lg bg-surface-50 text-surface-600 hover:bg-surface-100 border border-surface-200';
+        }
+    });
+
+    renderInputAbsensiPreviewTable();
+}
+
+function renderInputAbsensiPreviewTable() {
+    const tbody = document.getElementById('absensi-preview-table-body');
+    const emptyState = document.getElementById('absensi-preview-empty');
+    const countEl = document.getElementById('absensi-preview-count');
+    if (!tbody) return;
+
+    const today = formatDateISO(new Date());
+    let list = allAbsensiData.filter(item => item.tanggal === today);
+
+    if (currentAbsensiPreviewFilter && currentAbsensiPreviewFilter !== 'semua') {
+        list = list.filter(item => (item.status || '').toLowerCase() === currentAbsensiPreviewFilter.toLowerCase());
+    }
+
+    const searchInput = document.getElementById('search-absensi-preview');
+    const q = (searchInput?.value || '').toLowerCase().trim();
+    if (q) {
+        list = list.filter(item => (item.nama || '').toLowerCase().includes(q) || (item.keterangan || '').toLowerCase().includes(q));
+    }
+
+    if (countEl) countEl.textContent = list.length;
+
+    if (list.length === 0) {
+        tbody.innerHTML = '';
+        if (emptyState) {
+            emptyState.classList.remove('hidden');
+            emptyState.classList.add('flex');
+        }
+        return;
+    }
+
+    if (emptyState) {
+        emptyState.classList.add('hidden');
+        emptyState.classList.remove('flex');
+    }
+
+    tbody.innerHTML = list.map((item, index) => {
+        const isNew = LivewireEngine.isHighlighted(item.id);
+        const highlightClass = isNew ? 'livewire-row-highlight' : '';
+        return `
+        <tr id="prev-row-${item.id}" data-livewire-id="${item.id}" class="hover:bg-surface-50/70 transition-colors ${highlightClass}">
+            <td class="px-4 py-2.5 font-medium text-surface-400">${index + 1}</td>
+            <td class="px-4 py-2.5 font-semibold text-surface-900">
+                <div class="flex items-center gap-2">
+                    <div class="w-6 h-6 rounded-full bg-primary-100 text-primary-700 font-bold text-[10px] flex items-center justify-center shrink-0">
+                        ${getInitials(item.nama)}
+                    </div>
+                    <span class="truncate max-w-[130px]">${escapeHtml(item.nama)}</span>
+                </div>
+            </td>
+            <td class="px-4 py-2.5 font-mono text-surface-600">${escapeHtml(item.jam || '-')}</td>
+            <td class="px-4 py-2.5">
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold badge-${(item.status || '').toLowerCase()}">
+                    ${getStatusIcon(item.status)} ${escapeHtml(item.status)}
+                </span>
+            </td>
+            <td class="px-4 py-2.5 text-surface-500 truncate max-w-[120px]">${escapeHtml(item.keterangan || '-')}</td>
+            <td class="px-4 py-2.5 text-center">
+                <div class="flex items-center justify-center gap-1">
+                    <button type="button" onclick="openEditModal('${item.id}')" class="p-1 rounded text-surface-400 hover:text-primary-600 hover:bg-primary-50 transition-colors" title="Edit Absensi">
+                        <i class="fa-solid fa-pen-to-square text-[11px]"></i>
+                    </button>
+                    <button type="button" onclick="deleteAbsensi('${item.id}')" class="p-1 rounded text-surface-400 hover:text-rose-600 hover:bg-rose-50 transition-colors" title="Hapus Absensi">
+                        <i class="fa-solid fa-trash-can text-[11px]"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `}).join('');
+}
+
 
 // -----------------------------------------------
 // 3. INITIALIZATION — DOM READY
@@ -103,6 +312,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Bersihkan data demo yang tersisa
     cleanupLegacyDemoData(false);
+
+    // Render Livewire Preview Table
+    renderInputAbsensiPreviewTable();
 
     // Coba hubungkan ke Firebase (Realtime Database atau Firestore)
     connectToFirebase();
@@ -390,6 +602,7 @@ function setupRealtimeDbListeners() {
         saveToLocalStorage();
         updateStatCards();
         renderAttendanceTable();
+        renderInputAbsensiPreviewTable();
         updateChartData();
         renderRecentScansFeed();
         if (currentPage === 'rekap') filterRekapData();
@@ -449,6 +662,7 @@ function setupFirestoreListeners() {
         saveToLocalStorage();
         updateStatCards();
         renderAttendanceTable();
+        renderInputAbsensiPreviewTable();
         updateChartData();
         renderRecentScansFeed();
         if (currentPage === 'rekap') filterRekapData();
@@ -521,6 +735,7 @@ function loadFromLocalStorage() {
 
         updateStatCards();
         renderAttendanceTable();
+        renderInputAbsensiPreviewTable();
         updateChartData();
         renderKaryawanTable(allKaryawanData);
         updateKaryawanDatalist();
@@ -534,6 +749,7 @@ function ensureDataAvailable() {
     cleanupLegacyDemoData(false);
     updateStatCards();
     renderAttendanceTable();
+    renderInputAbsensiPreviewTable();
     updateChartData();
     renderKaryawanTable(allKaryawanData);
     updateKaryawanDatalist();
@@ -893,8 +1109,11 @@ function renderAttendanceTable() {
     emptyState?.classList.add('hidden');
     emptyState?.classList.remove('flex');
 
-    tbody.innerHTML = displayData.map((item, index) => `
-        <tr class="group hover:bg-surface-50 transition-colors">
+    tbody.innerHTML = displayData.map((item, index) => {
+        const isNew = LivewireEngine.isHighlighted(item.id);
+        const highlightClass = isNew ? 'livewire-row-highlight' : '';
+        return `
+        <tr id="attendance-row-${item.id}" data-livewire-id="${item.id}" class="group hover:bg-surface-50 transition-colors ${highlightClass}">
             <td class="px-6 py-3.5 text-sm text-surface-400 font-medium">${index + 1}</td>
             <td class="px-6 py-3.5">
                 <div class="flex items-center gap-3">
@@ -925,7 +1144,7 @@ function renderAttendanceTable() {
                 </div>
             </td>
         </tr>
-    `).join('');
+    `}).join('');
 
     if (countEl) countEl.textContent = filtered.length;
 }
@@ -936,7 +1155,11 @@ function loadMoreData() {
 }
 
 function filterTable(query) {
-    renderAttendanceTable();
+    LivewireEngine.startLoading('dashboard-absensi');
+    LivewireEngine.debounce('filter-dashboard', () => {
+        renderAttendanceTable();
+        LivewireEngine.stopLoading('dashboard-absensi');
+    }, 200);
 }
 
 
@@ -945,6 +1168,7 @@ function filterTable(query) {
 // -----------------------------------------------
 
 function filterRekapData() {
+    LivewireEngine.startLoading('rekap');
     const startDate = document.getElementById('filter-start')?.value;
     const endDate = document.getElementById('filter-end')?.value;
 
@@ -959,6 +1183,7 @@ function filterRekapData() {
     });
 
     renderRekapTable(filtered);
+    LivewireEngine.stopLoading('rekap');
 }
 
 function renderRekapTable(data) {
@@ -981,8 +1206,10 @@ function renderRekapTable(data) {
 
     tbody.innerHTML = data.map((item, index) => {
         const isSelected = selectedRekapIds.has(item.id);
+        const isNew = LivewireEngine.isHighlighted(item.id);
+        const highlightClass = isNew ? 'livewire-row-highlight' : '';
         return `
-        <tr class="group hover:bg-surface-50 transition-colors ${isSelected ? 'row-selected' : ''}" id="rekap-row-${item.id}">
+        <tr class="group hover:bg-surface-50 transition-colors ${isSelected ? 'row-selected' : ''} ${highlightClass}" id="rekap-row-${item.id}" data-livewire-id="${item.id}">
             <td class="w-12 px-4 py-3.5 text-center">
                 <input type="checkbox" class="table-checkbox w-4 h-4 rounded text-primary-600 border-surface-300 focus:ring-primary-500 cursor-pointer"
                     data-id="${item.id}"
@@ -1122,6 +1349,9 @@ async function executeDeleteSelectedRekap() {
 
     const idsToDelete = Array.from(selectedRekapIds);
 
+    // Animasi Livewire baris keluar bersamaan
+    await LivewireEngine.animateRowDelete(idsToDelete.map(id => `#rekap-row-${id}, #attendance-row-${id}, #prev-row-${id}`).join(', '));
+
     // Hapus dari Firebase jika terhubung
     if (isFirebaseConnected) {
         if (activeEngine === 'rtdb' && rtdb) {
@@ -1137,6 +1367,7 @@ async function executeDeleteSelectedRekap() {
 
     updateStatCards();
     renderAttendanceTable();
+    renderInputAbsensiPreviewTable();
     updateChartData();
     filterRekapData();
     updateRekapBulkUI();
@@ -1397,6 +1628,15 @@ async function handleSubmitAbsensi(event) {
         return;
     }
 
+    const submitBtn = document.getElementById('btn-submit');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i> Menyimpan...';
+    }
+
+    LivewireEngine.startLoading('absensi-preview');
+    LivewireEngine.startLoading('dashboard-absensi');
+
     const newRecord = { nama, tanggal, jam, status, keterangan, timestamp: Date.now() };
 
     // Simpan ke cloud
@@ -1420,16 +1660,27 @@ async function handleSubmitAbsensi(event) {
     allAbsensiData.unshift(newRecord);
     saveToLocalStorage();
 
+    // Livewire in-place refresh & highlight - HANYA TABEL YANG KE-REFRESH TANPA GANTI HALAMAN
+    LivewireEngine.highlightRow(newRecord.id);
     updateStatCards();
     renderAttendanceTable();
+    renderInputAbsensiPreviewTable();
     updateChartData();
 
     document.getElementById('attendance-form').reset();
     resetAbsenFormCaberawit();
     setDefaultFormDate();
 
-    showToast(`Absensi ${nama} (${status}) berhasil disimpan!`, 'success');
-    navigateTo('dashboard');
+    if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<span>Simpan Absensi</span><i class="fa-solid fa-arrow-right text-xs group-hover:translate-x-1 transition-transform"></i>';
+    }
+
+    LivewireEngine.stopLoading('absensi-preview');
+    LivewireEngine.stopLoading('dashboard-absensi');
+
+    showToast(`✅ Absensi ${nama} (${status}) berhasil dicatat & data tabel diperbarui!`, 'success');
+    // TIDAK memanggil navigateTo('dashboard') agar user tetap di halaman ini tanpa reload!
 }
 
 async function handleQuickSubmitAbsensi(event) {
@@ -1456,6 +1707,9 @@ async function handleQuickSubmitAbsensi(event) {
         return;
     }
 
+    LivewireEngine.startLoading('dashboard-absensi');
+    LivewireEngine.startLoading('absensi-preview');
+
     const newRecord = { nama, tanggal, jam, status, keterangan, timestamp: Date.now() };
 
     if (isFirebaseConnected) {
@@ -1478,9 +1732,15 @@ async function handleQuickSubmitAbsensi(event) {
     allAbsensiData.unshift(newRecord);
     saveToLocalStorage();
 
+    LivewireEngine.highlightRow(newRecord.id);
     updateStatCards();
     renderAttendanceTable();
+    renderInputAbsensiPreviewTable();
     updateChartData();
+    if (currentPage === 'rekap') filterRekapData();
+
+    LivewireEngine.stopLoading('dashboard-absensi');
+    LivewireEngine.stopLoading('absensi-preview');
 
     closeModal('modal-quick-absensi');
     showToast(`Absensi cepat ${nama} berhasil disimpan!`, 'success');
@@ -1560,6 +1820,10 @@ async function handleUpdateAbsensi(event) {
         timestamp: Date.now()
     };
 
+    LivewireEngine.startLoading('dashboard-absensi');
+    LivewireEngine.startLoading('absensi-preview');
+    if (currentPage === 'rekap') LivewireEngine.startLoading('rekap');
+
     if (isFirebaseConnected) {
         if (activeEngine === 'rtdb' && rtdb) {
             rtdb.ref(`absensi/${id}`).update(updatedData).catch(() => {});
@@ -1572,10 +1836,16 @@ async function handleUpdateAbsensi(event) {
     if (idx !== -1) allAbsensiData[idx] = { ...allAbsensiData[idx], ...updatedData };
     saveToLocalStorage();
 
+    LivewireEngine.highlightRow(id);
     updateStatCards();
     renderAttendanceTable();
+    renderInputAbsensiPreviewTable();
     updateChartData();
     if (currentPage === 'rekap') filterRekapData();
+
+    LivewireEngine.stopLoading('dashboard-absensi');
+    LivewireEngine.stopLoading('absensi-preview');
+    if (currentPage === 'rekap') LivewireEngine.stopLoading('rekap');
 
     closeModal('modal-edit');
     showToast('Data absensi berhasil diperbarui!', 'success');
@@ -1586,6 +1856,9 @@ async function deleteAbsensi(id) {
     const nama = item ? item.nama : 'data ini';
 
     if (!confirm(`Hapus absensi untuk "${nama}"?`)) return;
+
+    // Animasi Livewire row delete sebelum elemen dihapus
+    await LivewireEngine.animateRowDelete(`#attendance-row-${id}, #prev-row-${id}, #rekap-row-${id}`);
 
     if (isFirebaseConnected) {
         if (activeEngine === 'rtdb' && rtdb) {
@@ -1601,6 +1874,7 @@ async function deleteAbsensi(id) {
 
     updateStatCards();
     renderAttendanceTable();
+    renderInputAbsensiPreviewTable();
     updateChartData();
     if (currentPage === 'rekap') filterRekapData();
     updateRekapBulkUI();
@@ -1635,8 +1909,10 @@ function renderKaryawanTable(data) {
 
     tbody.innerHTML = data.map((item, index) => {
         const isSelected = selectedKaryawanIds.has(item.id);
+        const isNew = LivewireEngine.isHighlighted(item.id);
+        const highlightClass = isNew ? 'livewire-row-highlight' : '';
         return `
-        <tr class="group hover:bg-surface-50 transition-colors ${isSelected ? 'row-selected' : ''}" id="karyawan-row-${item.id}">
+        <tr class="group hover:bg-surface-50 transition-colors ${isSelected ? 'row-selected' : ''} ${highlightClass}" id="karyawan-row-${item.id}" data-livewire-id="${item.id}">
             <td class="w-12 px-4 py-3.5 text-center">
                 <input type="checkbox" class="table-checkbox w-4 h-4 rounded text-primary-600 border-surface-300 focus:ring-primary-500 cursor-pointer"
                     data-id="${item.id}"
@@ -1777,6 +2053,9 @@ async function executeDeleteSelectedKaryawan() {
 
     const idsToDelete = Array.from(selectedKaryawanIds);
 
+    // Animasi Livewire baris keluar bersamaan
+    await LivewireEngine.animateRowDelete(idsToDelete.map(id => `#karyawan-row-${id}`).join(', '));
+
     if (isFirebaseConnected) {
         if (activeEngine === 'rtdb' && rtdb) {
             await Promise.all(idsToDelete.map(id => rtdb.ref(`karyawan/${id}`).remove().catch(() => {})));
@@ -1806,17 +2085,21 @@ async function executeCurrentBulkDelete() {
 
 
 function filterKaryawanTable(query) {
-    const q = (query || '').toLowerCase().trim();
-    if (!q) {
-        renderKaryawanTable(allKaryawanData);
-        return;
-    }
-    const filtered = allKaryawanData.filter(k =>
-        (k.nama || '').toLowerCase().includes(q) ||
-        (k.jabatan || '').toLowerCase().includes(q) ||
-        (k.email || '').toLowerCase().includes(q)
-    );
-    renderKaryawanTable(filtered);
+    LivewireEngine.startLoading('karyawan');
+    LivewireEngine.debounce('filter-karyawan', () => {
+        const q = (query || '').toLowerCase().trim();
+        if (!q) {
+            renderKaryawanTable(allKaryawanData);
+        } else {
+            const filtered = allKaryawanData.filter(k =>
+                (k.nama || '').toLowerCase().includes(q) ||
+                (k.jabatan || '').toLowerCase().includes(q) ||
+                (k.email || '').toLowerCase().includes(q)
+            );
+            renderKaryawanTable(filtered);
+        }
+        LivewireEngine.stopLoading('karyawan');
+    }, 200);
 }
 
 function updateKaryawanDatalist() {
@@ -1960,6 +2243,7 @@ async function handleSubmitKaryawan(event) {
             allKaryawanData.sort((a, b) => (a.nama || '').localeCompare(b.nama || ''));
         }
         saveKaryawanToLocalStorage();
+        LivewireEngine.highlightRow(newKaryawan.id);
         renderKaryawanTable(allKaryawanData);
         updateKaryawanDatalist();
         updateQuickQRCaberawitSelect();
@@ -1975,6 +2259,7 @@ async function handleSubmitKaryawan(event) {
             allKaryawanData.push(newKaryawan);
         }
         saveKaryawanToLocalStorage();
+        LivewireEngine.highlightRow(newKaryawan.id);
         renderKaryawanTable(allKaryawanData);
         updateKaryawanDatalist();
         updateQuickQRCaberawitSelect();
@@ -2028,6 +2313,7 @@ async function handleUpdateKaryawan(event) {
     const idx = allKaryawanData.findIndex(k => k.id === id);
     if (idx !== -1) allKaryawanData[idx] = { ...allKaryawanData[idx], ...updated };
     saveKaryawanToLocalStorage();
+    LivewireEngine.highlightRow(id);
     renderKaryawanTable(allKaryawanData);
     updateKaryawanDatalist();
 
@@ -2040,6 +2326,9 @@ async function deleteKaryawan(id) {
     const nama = item ? item.nama : 'karyawan ini';
 
     if (!confirm(`Hapus karyawan "${nama}" dari sistem?`)) return;
+
+    // Animasi Livewire row delete sebelum elemen dihapus
+    await LivewireEngine.animateRowDelete('#karyawan-row-' + id);
 
     if (isFirebaseConnected) {
         if (activeEngine === 'rtdb' && rtdb) {
@@ -2120,6 +2409,8 @@ function navigateTo(page) {
 
     if (page === 'scan') {
         initQRScannerPage();
+    } else if (page === 'absensi') {
+        renderInputAbsensiPreviewTable();
     } else if (page === 'rekap') {
         filterRekapData();
     } else if (page === 'karyawan') {
@@ -3571,6 +3862,7 @@ function showJurnalDetail(id) {
 async function handleSubmitJurnal(event) {
     event.preventDefault();
 
+    LivewireEngine.startLoading('jurnal');
     const editId = document.getElementById('jurnal-edit-id').value;
     const data = {
         guru: document.getElementById('jurnal-guru').value.trim(),
@@ -3597,26 +3889,34 @@ async function handleSubmitJurnal(event) {
                 const idx = allJurnalData.findIndex(j => j.id === editId);
                 if (idx !== -1) allJurnalData[idx] = { ...allJurnalData[idx], ...data };
                 saveJurnalToLocalStorage();
-                renderJurnalData();
             }
+            LivewireEngine.highlightRow(editId);
+            renderJurnalData();
             showToast('Jurnal KBM berhasil diperbarui!', 'success');
         } else {
             // CREATE
+            let newId = null;
             if (activeEngine === 'rtdb' && rtdb) {
-                await rtdb.ref('jurnal').push(data);
+                const pushRef = await rtdb.ref('jurnal').push(data);
+                newId = pushRef.key;
             } else if (activeEngine === 'firestore' && db) {
-                await db.collection('jurnal').add(data);
+                const docRef = await db.collection('jurnal').add(data);
+                newId = docRef.id;
             } else {
                 data.id = 'jurnal-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
+                newId = data.id;
                 allJurnalData.unshift(data);
                 saveJurnalToLocalStorage();
-                renderJurnalData();
             }
+            if (newId) LivewireEngine.highlightRow(newId);
+            renderJurnalData();
             showToast('Jurnal KBM baru berhasil disimpan!', 'success');
         }
     } catch (err) {
         console.error('Jurnal save error:', err);
         showToast('Gagal menyimpan jurnal. Coba lagi.', 'error');
+    } finally {
+        LivewireEngine.stopLoading('jurnal');
     }
 
     closeModal('modal-jurnal');
@@ -3629,17 +3929,20 @@ function confirmDeleteJurnal(id) {
 
 async function executeDeleteJurnal() {
     if (!pendingDeleteJurnalId) return;
+    const deleteId = pendingDeleteJurnalId;
 
     try {
+        await LivewireEngine.animateRowDelete('#jurnal-row-' + deleteId);
+
         if (activeEngine === 'rtdb' && rtdb) {
-            await rtdb.ref(`jurnal/${pendingDeleteJurnalId}`).remove();
+            await rtdb.ref(`jurnal/${deleteId}`).remove();
         } else if (activeEngine === 'firestore' && db) {
-            await db.collection('jurnal').doc(pendingDeleteJurnalId).delete();
+            await db.collection('jurnal').doc(deleteId).delete();
         } else {
-            allJurnalData = allJurnalData.filter(j => j.id !== pendingDeleteJurnalId);
+            allJurnalData = allJurnalData.filter(j => j.id !== deleteId);
             saveJurnalToLocalStorage();
-            renderJurnalData();
         }
+        renderJurnalData();
         showToast('Jurnal berhasil dihapus.', 'success');
     } catch (err) {
         console.error('Delete jurnal error:', err);
@@ -3657,52 +3960,56 @@ function renderJurnalData() {
 }
 
 function filterJurnalTable() {
-    const searchEl = document.getElementById('search-jurnal');
-    const periodeEl = document.getElementById('filter-jurnal-periode');
-    const tanggalEl = document.getElementById('filter-jurnal-tanggal');
-    const kelasEl = document.getElementById('filter-jurnal-kelas');
-    const mapelEl = document.getElementById('filter-jurnal-mapel');
+    LivewireEngine.startLoading('jurnal');
+    LivewireEngine.debounce('filter-jurnal', () => {
+        const searchEl = document.getElementById('search-jurnal');
+        const periodeEl = document.getElementById('filter-jurnal-periode');
+        const tanggalEl = document.getElementById('filter-jurnal-tanggal');
+        const kelasEl = document.getElementById('filter-jurnal-kelas');
+        const mapelEl = document.getElementById('filter-jurnal-mapel');
 
-    const searchTerm = (searchEl?.value || '').toLowerCase().trim();
-    const periode = periodeEl?.value || 'semua';
-    const tanggalFilter = tanggalEl?.value || '';
-    const kelasFilter = kelasEl?.value || 'semua';
-    const mapelFilter = mapelEl?.value || 'semua';
+        const searchTerm = (searchEl?.value || '').toLowerCase().trim();
+        const periode = periodeEl?.value || 'semua';
+        const tanggalFilter = tanggalEl?.value || '';
+        const kelasFilter = kelasEl?.value || 'semua';
+        const mapelFilter = mapelEl?.value || 'semua';
 
-    const todayStr = formatDateISO(new Date());
-    const now = new Date();
-    const weekStart = new Date(now);
-    weekStart.setDate(now.getDate() - now.getDay());
-    const weekStartStr = formatDateISO(weekStart);
-    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+        const todayStr = formatDateISO(new Date());
+        const now = new Date();
+        const weekStart = new Date(now);
+        weekStart.setDate(now.getDate() - now.getDay());
+        const weekStartStr = formatDateISO(weekStart);
+        const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
 
-    filteredJurnalData = allJurnalData.filter(item => {
-        // Search filter
-        if (searchTerm) {
-            const searchable = `${item.guru || ''} ${item.materi || ''} ${item.kelas || ''} ${item.mapel || ''} ${item.kegiatan || ''} ${item.catatan || ''}`.toLowerCase();
-            if (!searchable.includes(searchTerm)) return false;
-        }
+        filteredJurnalData = allJurnalData.filter(item => {
+            // Search filter
+            if (searchTerm) {
+                const searchable = `${item.guru || ''} ${item.materi || ''} ${item.kelas || ''} ${item.mapel || ''} ${item.kegiatan || ''} ${item.catatan || ''}`.toLowerCase();
+                if (!searchable.includes(searchTerm)) return false;
+            }
 
-        // Specific date filter
-        if (tanggalFilter && item.tanggal !== tanggalFilter) return false;
+            // Specific date filter
+            if (tanggalFilter && item.tanggal !== tanggalFilter) return false;
 
-        // Periode filter
-        if (periode === 'hari-ini' && item.tanggal !== todayStr) return false;
-        if (periode === 'minggu-ini' && item.tanggal < weekStartStr) return false;
-        if (periode === 'bulan-ini' && item.tanggal < monthStart) return false;
+            // Periode filter
+            if (periode === 'hari-ini' && item.tanggal !== todayStr) return false;
+            if (periode === 'minggu-ini' && item.tanggal < weekStartStr) return false;
+            if (periode === 'bulan-ini' && item.tanggal < monthStart) return false;
 
-        // Kelas filter
-        if (kelasFilter !== 'semua' && item.kelas !== kelasFilter) return false;
+            // Kelas filter
+            if (kelasFilter !== 'semua' && item.kelas !== kelasFilter) return false;
 
-        // Mapel filter
-        if (mapelFilter !== 'semua' && item.mapel !== mapelFilter) return false;
+            // Mapel filter
+            if (mapelFilter !== 'semua' && item.mapel !== mapelFilter) return false;
 
-        return true;
-    });
+            return true;
+        });
 
-    renderJurnalTable(filteredJurnalData);
-    renderJurnalCardList(filteredJurnalData);
-    updateJurnalStats();
+        renderJurnalTable(filteredJurnalData);
+        renderJurnalCardList(filteredJurnalData);
+        updateJurnalStats();
+        LivewireEngine.stopLoading('jurnal');
+    }, 180);
 }
 
 function renderJurnalTable(data) {
@@ -3723,6 +4030,8 @@ function renderJurnalTable(data) {
     if (emptyEl) emptyEl.classList.add('hidden'), emptyEl.classList.remove('flex');
 
     tbody.innerHTML = data.map(item => {
+        const isNew = LivewireEngine.isHighlighted(item.id);
+        const highlightClass = isNew ? 'livewire-row-highlight' : '';
         const tanggalFormatted = item.tanggal ? new Date(item.tanggal + 'T00:00:00').toLocaleDateString('id-ID', {
             day: 'numeric', month: 'short', year: 'numeric'
         }) : '-';
@@ -3731,7 +4040,7 @@ function renderJurnalTable(data) {
         const pctColor = pctHadir >= 80 ? 'emerald' : pctHadir >= 50 ? 'amber' : 'rose';
 
         return `
-        <tr class="hover:bg-surface-50/50 transition-colors">
+        <tr id="jurnal-row-${item.id}" data-livewire-id="${item.id}" class="hover:bg-surface-50/50 transition-colors ${highlightClass}">
             <td class="px-5 py-3.5">
                 <p class="text-sm font-semibold text-surface-800">${tanggalFormatted}</p>
                 <p class="text-[11px] text-surface-400">${escapeHtml(item.jam || '-')} WIB</p>
@@ -4250,6 +4559,7 @@ async function handleSubmitRaport(event) {
     }
 
     saveRaportToLocalStorage();
+    LivewireEngine.highlightRow(id);
     closeModal('modal-raport');
     renderRaportData();
     showToast(editId ? 'Data raport berhasil diperbarui!' : 'Raport baru berhasil dicatat & disimpan!', 'success');
@@ -4263,6 +4573,8 @@ function confirmDeleteRaport(id) {
 async function executeDeleteRaport() {
     if (!pendingDeleteRaportId) return;
     const id = pendingDeleteRaportId;
+
+    await LivewireEngine.animateRowDelete('#raport-row-' + id);
 
     if (isFirebaseConnected) {
         if (activeEngine === 'rtdb' && rtdb) {
@@ -4283,37 +4595,41 @@ async function executeDeleteRaport() {
 // --- FILTERING & RENDERING ---
 
 function filterRaportTable() {
-    const searchVal = document.getElementById('search-raport')?.value?.toLowerCase().trim() || '';
-    const periodeVal = document.getElementById('filter-raport-periode')?.value || 'semua';
-    const kelasVal = document.getElementById('filter-raport-kelas')?.value || 'semua';
+    LivewireEngine.startLoading('raport');
+    LivewireEngine.debounce('filter-raport', () => {
+        const searchVal = document.getElementById('search-raport')?.value?.toLowerCase().trim() || '';
+        const periodeVal = document.getElementById('filter-raport-periode')?.value || 'semua';
+        const kelasVal = document.getElementById('filter-raport-kelas')?.value || 'semua';
 
-    const now = new Date();
-    const curYear = now.getFullYear();
-    const curMonth = now.getMonth();
+        const now = new Date();
+        const curYear = now.getFullYear();
+        const curMonth = now.getMonth();
 
-    filteredRaportData = allRaportData.filter(item => {
-        if (searchVal && !((item.nama || '').toLowerCase().includes(searchVal) || (item.mapel || '').toLowerCase().includes(searchVal) || (item.kekurangan || '').toLowerCase().includes(searchVal))) {
-            return false;
-        }
+        filteredRaportData = allRaportData.filter(item => {
+            if (searchVal && !((item.nama || '').toLowerCase().includes(searchVal) || (item.mapel || '').toLowerCase().includes(searchVal) || (item.kekurangan || '').toLowerCase().includes(searchVal))) {
+                return false;
+            }
 
-        if (kelasVal !== 'semua' && item.kelas !== kelasVal) {
-            return false;
-        }
+            if (kelasVal !== 'semua' && item.kelas !== kelasVal) {
+                return false;
+            }
 
-        if (periodeVal !== 'semua' && item.periode) {
-            const [pY, pM] = item.periode.split('-').map(Number);
-            const diffMonths = (curYear - pY) * 12 + (curMonth - (pM - 1));
+            if (periodeVal !== 'semua' && item.periode) {
+                const [pY, pM] = item.periode.split('-').map(Number);
+                const diffMonths = (curYear - pY) * 12 + (curMonth - (pM - 1));
 
-            if (periodeVal === 'bulan-ini' && diffMonths !== 0) return false;
-            if (periodeVal === '3-bulan' && (diffMonths < 0 || diffMonths > 2)) return false;
-            if (periodeVal === '6-bulan' && (diffMonths < 0 || diffMonths > 5)) return false;
-        }
+                if (periodeVal === 'bulan-ini' && diffMonths !== 0) return false;
+                if (periodeVal === '3-bulan' && (diffMonths < 0 || diffMonths > 2)) return false;
+                if (periodeVal === '6-bulan' && (diffMonths < 0 || diffMonths > 5)) return false;
+            }
 
-        return true;
-    });
+            return true;
+        });
 
-    renderRaportTableBody();
-    updateRaportStats();
+        renderRaportTableBody();
+        updateRaportStats();
+        LivewireEngine.stopLoading('raport');
+    }, 180);
 }
 
 function updateRaportStats() {
@@ -4376,8 +4692,11 @@ function renderRaportTableBody() {
     };
 
     // 1. Desktop Table
-    tbody.innerHTML = filteredRaportData.map((item, idx) => `
-        <tr class="hover:bg-surface-50/70 transition-colors group">
+    tbody.innerHTML = filteredRaportData.map((item, idx) => {
+        const isNew = LivewireEngine.isHighlighted(item.id);
+        const highlightClass = isNew ? 'livewire-row-highlight' : '';
+        return `
+        <tr id="raport-row-${item.id}" data-livewire-id="${item.id}" class="hover:bg-surface-50/70 transition-colors group ${highlightClass}">
             <td class="px-5 py-3.5 text-xs text-surface-400 font-mono">${idx + 1}</td>
             <td class="px-5 py-3.5">
                 <div class="flex items-center gap-2.5">
@@ -4431,7 +4750,7 @@ function renderRaportTableBody() {
                 </div>
             </td>
         </tr>
-    `).join('');
+    `}).join('');
 
     // 2. Mobile Cards
     if (cardList) {

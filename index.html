@@ -144,7 +144,7 @@
             <nav class="flex-1 px-4 py-5 space-y-1 overflow-y-auto custom-scrollbar">
                 <p class="text-[10px] font-bold text-surface-400 uppercase tracking-widest px-3 mb-3">Menu Utama</p>
 
-                <a href="#" id="nav-dashboard" onclick="navigateTo('dashboard')"
+                <a href="javascript:void(0)" id="nav-dashboard" onclick="navigateTo('dashboard')"
                     class="nav-link active group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200">
                     <div
                         class="nav-icon-wrap w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200">
@@ -153,7 +153,7 @@
                     <span>Dashboard</span>
                 </a>
 
-                <a href="#" id="nav-absensi" onclick="navigateTo('absensi')"
+                <a href="javascript:void(0)" id="nav-absensi" onclick="navigateTo('absensi')"
                     class="nav-link group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200">
                     <div
                         class="nav-icon-wrap w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200">
@@ -162,7 +162,7 @@
                     <span>Input Absensi</span>
                 </a>
 
-                <a href="#" id="nav-scan" onclick="navigateTo('scan')"
+                <a href="javascript:void(0)" id="nav-scan" onclick="navigateTo('scan')"
                     class="nav-link group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200">
                     <div
                         class="nav-icon-wrap w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200">
@@ -172,7 +172,7 @@
                     <!-- <span class="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Auto</span> -->
                 </a>
 
-                <a href="#" id="nav-rekap" onclick="navigateTo('rekap')"
+                <a href="javascript:void(0)" id="nav-rekap" onclick="navigateTo('rekap')"
                     class="nav-link group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200">
                     <div
                         class="nav-icon-wrap w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200">
@@ -181,7 +181,7 @@
                     <span>Rekap Data</span>
                 </a>
 
-                <a href="#" id="nav-karyawan" onclick="navigateTo('karyawan')"
+                <a href="javascript:void(0)" id="nav-karyawan" onclick="navigateTo('karyawan')"
                     class="nav-link group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200">
                     <div
                         class="nav-icon-wrap w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200">
@@ -190,7 +190,7 @@
                     <span>Data Caberawit</span>
                 </a>
 
-                <a href="#" id="nav-jurnal" onclick="navigateTo('jurnal')"
+                <a href="javascript:void(0)" id="nav-jurnal" onclick="navigateTo('jurnal')"
                     class="nav-link group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200">
                     <div
                         class="nav-icon-wrap w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200">
@@ -200,7 +200,7 @@
                     <span id="badge-jurnal-today" class="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary-100 text-primary-700 hidden">0</span>
                 </a>
 
-                <a href="#" id="nav-raport" onclick="navigateTo('raport')"
+                <a href="javascript:void(0)" id="nav-raport" onclick="navigateTo('raport')"
                     class="nav-link group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200">
                     <div
                         class="nav-icon-wrap w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200">
@@ -224,7 +224,7 @@
                     <span class="ml-auto text-[9px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">Panduan</span>
                 </a>
 
-                <a href="#" id="nav-pengaturan" onclick="navigateTo('pengaturan')"
+                <a href="javascript:void(0)" id="nav-pengaturan" onclick="navigateTo('pengaturan')"
                     class="nav-link group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200">
                     <div
                         class="nav-icon-wrap w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200">
@@ -496,11 +496,23 @@
                     </div>
 
                     <!-- Recent Attendance Table -->
-                    <div class="bg-white rounded-2xl border border-surface-200/60 shadow-card overflow-hidden animate-slide-up"
+                    <div class="bg-white rounded-2xl border border-surface-200/60 shadow-card overflow-hidden animate-slide-up livewire-table-container"
                         style="animation-delay: 0.5s">
+                        <!-- Livewire Loading Shimmer Bar -->
+                        <div id="livewire-bar-dashboard-absensi" class="livewire-loading-bar"></div>
+
                         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-5 sm:p-6 pb-2">
                             <div>
-                                <h3 class="text-base font-bold text-surface-900">Log Absensi Terbaru</h3>
+                                <div class="flex items-center gap-2.5">
+                                    <h3 class="text-base font-bold text-surface-900">Log Absensi Terbaru</h3>
+                                    <div class="livewire-pill" title="Livewire Reactive: Hanya tabel ini yang ter-refresh tanpa memuat ulang seluruh halaman">
+                                        <span class="livewire-dot"></span>
+                                        <span>Livewire</span>
+                                        <button type="button" onclick="LivewireEngine.refresh('dashboard-absensi')" class="ml-1 hover:text-primary-800 transition-transform active:rotate-180" title="Refresh Tabel Ini Saja">
+                                            <i id="livewire-icon-dashboard-absensi" class="fa-solid fa-arrows-rotate text-[10px]"></i>
+                                        </button>
+                                    </div>
+                                </div>
                                 <p id="table-subtitle" class="text-xs text-surface-400 mt-0.5">Data kehadiran yang
                                     tercatat hari ini</p>
                             </div>
@@ -613,38 +625,56 @@
                  SECTION: INPUT ABSENSI
                  ============================ -->
                 <section id="section-absensi" class="page-section hidden">
-                    <div class="max-w-2xl mx-auto">
-                        <div
-                            class="bg-white rounded-2xl border border-surface-200/60 shadow-card p-6 sm:p-8 animate-slide-up">
-                            <div class="flex items-center gap-3 mb-6">
+                    <!-- Livewire Status Notification Banner -->
+                    <!-- <div class="mb-5 p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-indigo-500/10 to-primary-500/10 border border-emerald-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs animate-slide-up">
+                        <div class="flex items-center gap-3">
+                            <span class="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-sm shadow-md shadow-emerald-500/30 shrink-0">
+                                <i class="fa-solid fa-bolt"></i>
+                            </span>
+                            <div>
+                                <span class="font-bold text-surface-900 block text-xs sm:text-sm">Fitur Livewire Reactive Aktif (Tanpa Refresh Halaman)</span>
+                                <span class="text-surface-500 text-[11px]">Ketika Anda menambah, mengedit, atau menghapus absensi, hanya tabel yang diperbarui secara langsung tanpa me-reload atau kembali ke halaman semula.</span>
+                            </div>
+                        </div>
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            Live Reactive Sync
+                        </span>
+                    </div> -->
+
+                    <!-- 2-Column Responsive Layout: Form on Left + Live Table on Right -->
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                        <!-- Left: Form Input Absensi (5 cols on lg) -->
+                        <div class="lg:col-span-5 bg-white rounded-2xl border border-surface-200/60 shadow-card p-5 sm:p-6 animate-slide-up">
+                            <div class="flex items-center gap-3 mb-5">
                                 <div
-                                    class="w-11 h-11 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-lg shadow-primary-500/20">
-                                    <i class="fa-solid fa-clipboard-check text-white text-lg"></i>
+                                    class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-md shadow-primary-500/20">
+                                    <i class="fa-solid fa-clipboard-check text-white text-base"></i>
                                 </div>
                                 <div>
-                                    <h3 class="text-lg font-bold text-surface-900">Input Absensi Baru</h3>
-                                    <p class="text-xs text-surface-400">Tambahkan data kehadiran caberawit</p>
+                                    <h3 class="text-base font-bold text-surface-900">Form Input Absensi</h3>
+                                    <p class="text-xs text-surface-400">Pilih atau ketik nama caberawit</p>
                                 </div>
                             </div>
 
-                            <form id="attendance-form" onsubmit="handleSubmitAbsensi(event)" class="space-y-5">
+                            <form id="attendance-form" onsubmit="handleSubmitAbsensi(event)" class="space-y-4">
                                 <!-- Nama Caberawit (Pilih dari Database / Ketik Mandiri) -->
                                 <div>
                                     <div class="flex items-center justify-between mb-2">
-                                        <label class="block text-sm font-semibold text-surface-700">
+                                        <label class="block text-xs font-semibold text-surface-700">
                                             Nama Caberawit <span class="text-rose-500">*</span>
                                         </label>
                                         <!-- Mode Switcher Tabs -->
-                                        <div class="inline-flex items-center p-0.5 bg-surface-100 rounded-xl border border-surface-200/80 text-xs shadow-inner">
+                                        <div class="inline-flex items-center p-0.5 bg-surface-100 rounded-lg border border-surface-200/80 text-[11px] shadow-inner">
                                             <button type="button" id="btn-mode-db" onclick="setAbsenInputMode('select')"
-                                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 bg-white text-primary-700 shadow-sm">
-                                                <i class="fa-solid fa-database text-[11px] text-primary-600"></i>
-                                                <span>Dari Database</span>
+                                                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md font-semibold transition-all duration-200 bg-white text-primary-700 shadow-xs">
+                                                <i class="fa-solid fa-database text-[10px] text-primary-600"></i>
+                                                <span>Database</span>
                                             </button>
                                             <button type="button" id="btn-mode-manual" onclick="setAbsenInputMode('manual')"
-                                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 text-surface-500 hover:text-surface-800">
-                                                <i class="fa-solid fa-keyboard text-[11px]"></i>
-                                                <span>Ketik Mandiri</span>
+                                                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md font-semibold transition-all duration-200 text-surface-500 hover:text-surface-800">
+                                                <i class="fa-solid fa-keyboard text-[10px]"></i>
+                                                <span>Ketik</span>
                                             </button>
                                         </div>
                                     </div>
@@ -652,37 +682,37 @@
                                     <!-- Mode 1: Sediakan Langsung Dari Database Caberawit -->
                                     <div id="wrapper-db-caberawit" class="space-y-2">
                                         <div class="relative">
-                                            <i class="fa-solid fa-users absolute left-3.5 top-1/2 -translate-y-1/2 text-primary-500 text-sm pointer-events-none"></i>
+                                            <i class="fa-solid fa-users absolute left-3.5 top-1/2 -translate-y-1/2 text-primary-500 text-xs pointer-events-none"></i>
                                             <select id="select-caberawit-absen" onchange="onSelectCaberawitChange(this)"
-                                                class="w-full pl-10 pr-10 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 appearance-none cursor-pointer font-medium text-surface-800 hover:border-primary-400">
-                                                <option value="">-- Memuat data dari database Caberawit... --</option>
+                                                class="w-full pl-9 pr-9 py-2.5 text-xs sm:text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 appearance-none cursor-pointer font-medium text-surface-800 hover:border-primary-400">
+                                                <option value="">-- Memuat data Caberawit... --</option>
                                             </select>
                                             <i class="fa-solid fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-surface-400 text-xs pointer-events-none"></i>
                                         </div>
                                         <div class="flex items-center justify-between text-xs px-1">
                                             <span class="inline-flex items-center gap-1.5 text-emerald-600 font-medium text-[11px]">
                                                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                                <span id="badge-db-caberawit-count">0 Caberawit terdaftar di database</span>
+                                                <span id="badge-db-caberawit-count">0 Caberawit</span>
                                             </span>
                                             <button type="button" onclick="setAbsenInputMode('manual')" class="text-[11px] text-primary-600 hover:text-primary-800 hover:underline font-medium inline-flex items-center gap-1">
-                                                <span>Nama belum ada? Ketik mandiri</span>
+                                                <span>Ketik mandiri</span>
                                                 <i class="fa-solid fa-arrow-right text-[9px]"></i>
                                             </button>
                                         </div>
                                         <!-- Info card saat murid dari database dipilih -->
-                                        <div id="caberawit-selected-info" class="hidden p-3 rounded-xl bg-primary-50/70 border border-primary-200/60 text-xs text-primary-900 animate-fade-in">
+                                        <div id="caberawit-selected-info" class="hidden p-2.5 rounded-xl bg-primary-50/70 border border-primary-200/60 text-xs text-primary-900 animate-fade-in">
                                             <div class="flex items-center justify-between">
-                                                <div class="flex items-center gap-2.5">
-                                                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-600 to-primary-700 text-white flex items-center justify-center font-bold text-xs shadow-sm">
+                                                <div class="flex items-center gap-2">
+                                                    <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-primary-600 to-primary-700 text-white flex items-center justify-center font-bold text-xs shadow-xs">
                                                         <span id="selected-info-initials">C</span>
                                                     </div>
                                                     <div>
-                                                        <span class="font-bold text-surface-900 block text-sm" id="selected-info-name">-</span>
-                                                        <span class="text-[11px] text-primary-700" id="selected-info-role">Caberawit</span>
+                                                        <span class="font-bold text-surface-900 block text-xs" id="selected-info-name">-</span>
+                                                        <span class="text-[10px] text-primary-700" id="selected-info-role">Caberawit</span>
                                                     </div>
                                                 </div>
-                                                <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200/80 inline-flex items-center gap-1">
-                                                    <i class="fa-solid fa-circle-check text-emerald-600"></i> Terpilih dari Database
+                                                <span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200/80 inline-flex items-center gap-1">
+                                                    <i class="fa-solid fa-circle-check text-emerald-600"></i> Terpilih
                                                 </span>
                                             </div>
                                         </div>
@@ -691,19 +721,19 @@
                                     <!-- Mode 2: Ketik Mandiri -->
                                     <div id="wrapper-manual-caberawit" class="space-y-2 hidden">
                                         <div class="relative">
-                                            <i class="fa-solid fa-user-pen absolute left-3.5 top-1/2 -translate-y-1/2 text-primary-500 text-sm"></i>
+                                            <i class="fa-solid fa-user-pen absolute left-3.5 top-1/2 -translate-y-1/2 text-primary-500 text-xs"></i>
                                             <input type="text" id="input-nama-manual" list="karyawan-datalist"
                                                 oninput="onManualInputNamaChange(this.value)"
-                                                placeholder="Ketik nama Caberawit secara mandiri..."
-                                                class="w-full pl-10 pr-4 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 placeholder:text-surface-400 font-medium text-surface-800" />
+                                                placeholder="Ketik nama Caberawit..."
+                                                class="w-full pl-9 pr-4 py-2.5 text-xs sm:text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 placeholder:text-surface-400 font-medium text-surface-800" />
                                         </div>
                                         <div class="flex items-center justify-between text-xs px-1">
                                             <span class="text-surface-500 text-[11px]">
-                                                <i class="fa-regular fa-keyboard text-surface-400 mr-1"></i> Ketik nama bebas (didukung saran autocomplete)
+                                                <i class="fa-regular fa-keyboard text-surface-400 mr-1"></i> Ketik nama bebas
                                             </span>
                                             <button type="button" onclick="setAbsenInputMode('select')" class="text-[11px] text-primary-600 hover:text-primary-800 hover:underline font-medium inline-flex items-center gap-1">
                                                 <i class="fa-solid fa-database text-[9px]"></i>
-                                                <span>Kembali ke pilihan database</span>
+                                                <span>Pilih database</span>
                                             </button>
                                         </div>
                                     </div>
@@ -714,29 +744,29 @@
                                 </div>
 
                                 <!-- Tanggal & Jam -->
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <div>
                                         <label for="input-tanggal"
-                                            class="block text-sm font-semibold text-surface-700 mb-1.5">
+                                            class="block text-xs font-semibold text-surface-700 mb-1">
                                             Tanggal <span class="text-rose-500">*</span>
                                         </label>
                                         <div class="relative">
                                             <i
-                                                class="fa-regular fa-calendar absolute left-3.5 top-1/2 -translate-y-1/2 text-surface-400 text-sm"></i>
+                                                class="fa-regular fa-calendar absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 text-xs"></i>
                                             <input type="date" id="input-tanggal" name="tanggal" required
-                                                class="w-full pl-10 pr-4 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200" />
+                                                class="w-full pl-8 pr-3 py-2 text-xs sm:text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200" />
                                         </div>
                                     </div>
                                     <div>
                                         <label for="input-jam"
-                                            class="block text-sm font-semibold text-surface-700 mb-1.5">
+                                            class="block text-xs font-semibold text-surface-700 mb-1">
                                             Jam Masuk <span class="text-rose-500">*</span>
                                         </label>
                                         <div class="relative">
                                             <i
-                                                class="fa-regular fa-clock absolute left-3.5 top-1/2 -translate-y-1/2 text-surface-400 text-sm"></i>
+                                                class="fa-regular fa-clock absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 text-xs"></i>
                                             <input type="time" id="input-jam" name="jam" required
-                                                class="w-full pl-10 pr-4 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200" />
+                                                class="w-full pl-8 pr-3 py-2 text-xs sm:text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200" />
                                         </div>
                                     </div>
                                 </div>
@@ -744,15 +774,15 @@
                                 <!-- Status -->
                                 <div>
                                     <label for="input-status"
-                                        class="block text-sm font-semibold text-surface-700 mb-1.5">
+                                        class="block text-xs font-semibold text-surface-700 mb-1">
                                         Status Kehadiran <span class="text-rose-500">*</span>
                                     </label>
                                     <div class="relative">
                                         <i
-                                            class="fa-solid fa-tag absolute left-3.5 top-1/2 -translate-y-1/2 text-surface-400 text-sm"></i>
+                                            class="fa-solid fa-tag absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 text-xs"></i>
                                         <select id="input-status" name="status" required
-                                            class="w-full pl-10 pr-4 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 appearance-none cursor-pointer"
-                                            style="background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22%2364748b%22%3E%3Cpath%20fill-rule%3D%22evenodd%22%20d%3D%22M5.23%207.21a.75.75%200%20011.06.02L10%2011.168l3.71-3.938a.75.75%200%20111.08%201.04l-4.25%204.5a.75.75%200%2001-1.08%200l-4.25-4.5a.75.75%200%2001.02-1.06z%22%20clip-rule%3D%22evenodd%22%2F%3E%3C%2Fsvg%3E'); background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 1.25em;">
+                                            class="w-full pl-8 pr-8 py-2 text-xs sm:text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 appearance-none cursor-pointer"
+                                            style="background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22%2364748b%22%3E%3Cpath%20fill-rule%3D%22evenodd%22%20d%3D%22M5.23%207.21a.75.75%200%20011.06.02L10%2011.168l3.71-3.938a.75.75%200%20111.08%201.04l-4.25%204.5a.75.75%200%2001-1.08%200l-4.25-4.5a.75.75%200%2001.02-1.06z%22%20clip-rule%3D%22evenodd%22%2F%3E%3C%2Fsvg%3E'); background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 1.1em;">
                                             <option value="" disabled selected>Pilih status...</option>
                                             <option value="Hadir">✅ Hadir</option>
                                             <option value="Izin">📋 Izin</option>
@@ -765,28 +795,103 @@
                                 <!-- Keterangan -->
                                 <div>
                                     <label for="input-keterangan"
-                                        class="block text-sm font-semibold text-surface-700 mb-1.5">
+                                        class="block text-xs font-semibold text-surface-700 mb-1">
                                         Keterangan <span class="text-surface-400 font-normal">(opsional)</span>
                                     </label>
-                                    <textarea id="input-keterangan" name="keterangan" rows="3"
+                                    <textarea id="input-keterangan" name="keterangan" rows="2"
                                         placeholder="Tambahkan catatan jika diperlukan..."
-                                        class="w-full px-4 py-3 text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 resize-none placeholder:text-surface-400"></textarea>
+                                        class="w-full px-3 py-2 text-xs sm:text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 resize-none placeholder:text-surface-400"></textarea>
                                 </div>
 
                                 <!-- Submit Buttons -->
-                                <div class="flex flex-col sm:flex-row gap-3 pt-2">
+                                <div class="flex flex-col sm:flex-row gap-2.5 pt-1">
                                     <button type="submit" id="btn-submit"
-                                        class="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-600 to-primary-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-primary-500/25 hover:shadow-xl hover:shadow-primary-500/30 hover:from-primary-700 hover:to-primary-800 active:scale-[0.98] transition-all duration-200">
+                                        class="flex-1 inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-md shadow-primary-500/25 hover:shadow-lg hover:from-primary-700 hover:to-primary-800 active:scale-[0.98] transition-all duration-200">
                                         <i class="fa-solid fa-paper-plane text-xs"></i>
-                                        Simpan Absensi
+                                        <span>Simpan Absensi</span>
                                     </button>
                                     <button type="reset"
-                                        class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-surface-100 text-surface-600 text-sm font-semibold rounded-xl hover:bg-surface-200 active:scale-[0.98] transition-all duration-200">
+                                        class="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-surface-100 text-surface-600 text-xs sm:text-sm font-semibold rounded-xl hover:bg-surface-200 active:scale-[0.98] transition-all duration-200">
                                         <i class="fa-solid fa-rotate-left text-xs"></i>
-                                        Reset
+                                        <span>Reset</span>
                                     </button>
                                 </div>
                             </form>
+                        </div>
+
+                        <!-- Right: Livewire Reactive Attendance Preview Table (7 cols on lg) -->
+                        <div class="lg:col-span-7 bg-white rounded-2xl border border-surface-200/60 shadow-card overflow-hidden animate-slide-up livewire-table-container">
+                            <!-- Shimmer Loading Bar (Livewire Loading) -->
+                            <div id="livewire-bar-absensi-preview" class="livewire-loading-bar"></div>
+
+                            <div class="p-4 sm:p-5 border-b border-surface-100">
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                    <div>
+                                        <div class="flex items-center gap-2">
+                                            <h3 class="text-base font-bold text-surface-900">Log Absensi Hari Ini</h3>
+                                            <div class="livewire-pill" title="Livewire Reactive: Tabel otomatis ter-refresh saat data baru ditambahkan">
+                                                <span class="livewire-dot"></span>
+                                                <span>Livewire</span>
+                                                <button type="button" onclick="LivewireEngine.refresh('absensi-preview')" class="ml-1 hover:text-primary-800 transition-transform active:rotate-180" title="Refresh Tabel Ini Saja">
+                                                    <i id="livewire-icon-absensi-preview" class="fa-solid fa-arrows-rotate text-[10px]"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <p class="text-xs text-surface-400 mt-0.5">Tercatat <span id="absensi-preview-count" class="font-bold text-primary-600">0</span> santri hari ini</p>
+                                    </div>
+                                    <div class="relative">
+                                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 text-xs"></i>
+                                        <input id="search-absensi-preview" type="text" placeholder="Cari di log hari ini..."
+                                            oninput="renderInputAbsensiPreviewTable()"
+                                            class="text-xs bg-surface-50 border border-surface-200 rounded-xl pl-8 pr-3 py-1.5 w-full sm:w-44 focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all placeholder:text-surface-400 font-medium" />
+                                    </div>
+                                </div>
+
+                                <!-- Filter Buttons -->
+                                <div class="flex flex-wrap items-center gap-1.5 mt-3 pt-3 border-t border-surface-100/80 text-[11px] font-semibold">
+                                    <button type="button" onclick="setAbsensiPreviewFilter('semua')" id="btn-prev-filter-semua" class="prev-filter-btn px-2.5 py-1 rounded-lg bg-primary-600 text-white border border-primary-600">Semua</button>
+                                    <button type="button" onclick="setAbsensiPreviewFilter('Hadir')" id="btn-prev-filter-hadir" class="prev-filter-btn px-2.5 py-1 rounded-lg bg-surface-50 text-surface-600 hover:bg-surface-100 border border-surface-200">✅ Hadir</button>
+                                    <button type="button" onclick="setAbsensiPreviewFilter('Izin')" id="btn-prev-filter-izin" class="prev-filter-btn px-2.5 py-1 rounded-lg bg-surface-50 text-surface-600 hover:bg-surface-100 border border-surface-200">📋 Izin</button>
+                                    <button type="button" onclick="setAbsensiPreviewFilter('Sakit')" id="btn-prev-filter-sakit" class="prev-filter-btn px-2.5 py-1 rounded-lg bg-surface-50 text-surface-600 hover:bg-surface-100 border border-surface-200">🏥 Sakit</button>
+                                    <button type="button" onclick="setAbsensiPreviewFilter('Alpa')" id="btn-prev-filter-alpa" class="prev-filter-btn px-2.5 py-1 rounded-lg bg-surface-50 text-surface-600 hover:bg-surface-100 border border-surface-200">❌ Alpa</button>
+                                </div>
+                            </div>
+
+                            <div class="overflow-x-auto custom-scrollbar max-h-[440px] overflow-y-auto">
+                                <table class="w-full min-w-[500px]">
+                                    <thead class="sticky top-0 bg-surface-50/90 backdrop-blur-sm z-10">
+                                        <tr class="border-b border-surface-100">
+                                            <th class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-4 py-2.5">No</th>
+                                            <th class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-4 py-2.5">Nama</th>
+                                            <th class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-4 py-2.5">Jam</th>
+                                            <th class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-4 py-2.5">Status</th>
+                                            <th class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-4 py-2.5">Catatan</th>
+                                            <th class="text-center text-[11px] font-bold text-surface-400 uppercase tracking-wider px-4 py-2.5">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="absensi-preview-table-body" class="divide-y divide-surface-100 text-xs">
+                                        <!-- Injected by LivewireEngine -->
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Empty State for Preview -->
+                            <div id="absensi-preview-empty" class="hidden flex-col items-center justify-center py-12 px-4 text-center">
+                                <div class="w-12 h-12 rounded-full bg-surface-100 flex items-center justify-center mb-2.5">
+                                    <i class="fa-solid fa-clipboard-user text-xl text-surface-300"></i>
+                                </div>
+                                <p class="text-xs font-semibold text-surface-700">Belum ada absensi tercatat hari ini</p>
+                                <p class="text-[11px] text-surface-400 mt-0.5">Isi form di samping untuk mulai mencatat kehadiran.</p>
+                            </div>
+
+                            <!-- Footer -->
+                            <div class="px-5 py-3 border-t border-surface-100 flex items-center justify-between text-xs bg-surface-50/40">
+                                <span class="text-surface-400 text-[11px]"><i class="fa-solid fa-bolt text-emerald-500 mr-1"></i>Tersinkronisasi otomatis via Livewire Engine.</span>
+                                <button type="button" onclick="navigateTo('dashboard')" class="text-primary-600 hover:text-primary-700 font-semibold hover:underline inline-flex items-center gap-1">
+                                    <span>Buka Dashboard</span>
+                                    <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -965,12 +1070,24 @@
                  ============================ -->
                 <section id="section-rekap" class="page-section hidden">
                     <div
-                        class="bg-white rounded-2xl border border-surface-200/60 shadow-card overflow-hidden animate-slide-up">
+                        class="bg-white rounded-2xl border border-surface-200/60 shadow-card overflow-hidden animate-slide-up livewire-table-container">
+                        <!-- Livewire Loading Shimmer Bar -->
+                        <div id="livewire-bar-rekap" class="livewire-loading-bar"></div>
+
                         <!-- Filters Row -->
                         <div
                             class="flex flex-col sm:flex-row sm:items-end gap-4 p-5 sm:p-6 border-b border-surface-100">
                             <div class="flex-1">
-                                <h3 class="text-base font-bold text-surface-900 mb-1">Rekap Data Absensi</h3>
+                                <div class="flex items-center gap-2.5 mb-1">
+                                    <h3 class="text-base font-bold text-surface-900">Rekap Data Absensi</h3>
+                                    <div class="livewire-pill" title="Livewire Reactive: Hanya tabel ini yang ter-refresh tanpa memuat ulang seluruh halaman">
+                                        <span class="livewire-dot"></span>
+                                        <span>Livewire</span>
+                                        <button type="button" onclick="LivewireEngine.refresh('rekap')" class="ml-1 hover:text-primary-800 transition-transform active:rotate-180" title="Refresh Tabel Ini Saja">
+                                            <i id="livewire-icon-rekap" class="fa-solid fa-arrows-rotate text-[10px]"></i>
+                                        </button>
+                                    </div>
+                                </div>
                                 <p class="text-xs text-surface-400">Filter dan ekspor data kehadiran</p>
                             </div>
                             <div class="flex flex-wrap items-center gap-2">
@@ -1072,11 +1189,23 @@
                  ============================ -->
                 <section id="section-karyawan" class="page-section hidden">
                     <div
-                        class="bg-white rounded-2xl border border-surface-200/60 shadow-card overflow-hidden animate-slide-up">
+                        class="bg-white rounded-2xl border border-surface-200/60 shadow-card overflow-hidden animate-slide-up livewire-table-container">
+                        <!-- Livewire Loading Shimmer Bar -->
+                        <div id="livewire-bar-karyawan" class="livewire-loading-bar"></div>
+
                         <div
                             class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-5 sm:p-6 border-b border-surface-100">
                             <div>
-                                <h3 class="text-base font-bold text-surface-900">Data Caberawit</h3>
+                                <div class="flex items-center gap-2.5">
+                                    <h3 class="text-base font-bold text-surface-900">Data Caberawit</h3>
+                                    <div class="livewire-pill" title="Livewire Reactive: Hanya tabel ini yang ter-refresh tanpa memuat ulang seluruh halaman">
+                                        <span class="livewire-dot"></span>
+                                        <span>Livewire</span>
+                                        <button type="button" onclick="LivewireEngine.refresh('karyawan')" class="ml-1 hover:text-primary-800 transition-transform active:rotate-180" title="Refresh Tabel Ini Saja">
+                                            <i id="livewire-icon-karyawan" class="fa-solid fa-arrows-rotate text-[10px]"></i>
+                                        </button>
+                                    </div>
+                                </div>
                                 <p class="text-xs text-surface-400 mt-0.5">Daftar Caberawit yang terdaftar dalam sistem
                                     (<span id="karyawan-count" class="font-semibold text-primary-600">0</span> orang)
                                 </p>
@@ -1235,7 +1364,10 @@
                     </div>
 
                     <!-- Main Journal Container -->
-                    <div class="bg-white rounded-2xl border border-surface-200/60 shadow-card overflow-hidden animate-slide-up">
+                    <div class="bg-white rounded-2xl border border-surface-200/60 shadow-card overflow-hidden animate-slide-up livewire-table-container">
+                        <!-- Livewire Loading Shimmer Bar -->
+                        <div id="livewire-bar-jurnal" class="livewire-loading-bar"></div>
+
                         <!-- Top Toolbar -->
                         <div class="flex flex-col gap-4 p-4 sm:p-6 border-b border-surface-100">
                             <div class="flex items-start justify-between">
@@ -1245,6 +1377,13 @@
                                         <span class="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-primary-50 text-primary-600 border border-primary-200/60">
                                             <span id="jurnal-count">0</span> Data
                                         </span>
+                                        <div class="livewire-pill" title="Livewire Reactive: Hanya tabel ini yang ter-refresh tanpa memuat ulang seluruh halaman">
+                                            <span class="livewire-dot"></span>
+                                            <span>Livewire</span>
+                                            <button type="button" onclick="LivewireEngine.refresh('jurnal')" class="ml-1 hover:text-primary-800 transition-transform active:rotate-180" title="Refresh Tabel Ini Saja">
+                                                <i id="livewire-icon-jurnal" class="fa-solid fa-arrows-rotate text-[10px]"></i>
+                                            </button>
+                                        </div>
                                     </h3>
                                     <p class="text-[10px] sm:text-xs text-surface-400 mt-0.5">Catatan aktivitas harian guru & materi pembelajaran</p>
                                 </div>
@@ -1417,7 +1556,10 @@
                     </div>
 
                     <!-- Main Raport Container -->
-                    <div class="bg-white rounded-2xl border border-surface-200/60 shadow-card overflow-hidden animate-slide-up">
+                    <div class="bg-white rounded-2xl border border-surface-200/60 shadow-card overflow-hidden animate-slide-up livewire-table-container">
+                        <!-- Livewire Loading Shimmer Bar -->
+                        <div id="livewire-bar-raport" class="livewire-loading-bar"></div>
+
                         <div class="flex flex-col gap-4 p-4 sm:p-6 border-b border-surface-100">
                             <div class="flex items-start justify-between">
                                 <div>
@@ -1426,6 +1568,13 @@
                                         <span class="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-violet-50 text-violet-600 border border-violet-200/60">
                                             <span id="raport-count">0</span> Data
                                         </span>
+                                        <div class="livewire-pill" title="Livewire Reactive: Hanya tabel ini yang ter-refresh tanpa memuat ulang seluruh halaman">
+                                            <span class="livewire-dot"></span>
+                                            <span>Livewire</span>
+                                            <button type="button" onclick="LivewireEngine.refresh('raport')" class="ml-1 hover:text-primary-800 transition-transform active:rotate-180" title="Refresh Tabel Ini Saja">
+                                                <i id="livewire-icon-raport" class="fa-solid fa-arrows-rotate text-[10px]"></i>
+                                            </button>
+                                        </div>
                                     </h3>
                                     <p class="text-[10px] sm:text-xs text-surface-400 mt-0.5">Catatan kekurangan materi setiap caberawit untuk disampaikan kepada orang tua</p>
                                 </div>

@@ -419,4 +419,112 @@
     }
 }
 
+/* ============================================================
+   LIVEWIRE REACTIVE TABLE ENGINE (NO-RELOAD REAL-TIME UI)
+   In-place reactive table updates, shimmer loading, row flash highlight,
+   and zero full page refresh / zero redirect to default page.
+   ============================================================ */
+
+/* Container wrapper with relative position for top loading shimmer */
+.livewire-table-container {
+    position: relative;
+    overflow: hidden;
+}
+
+/* Shimmer Progress Bar at top of table container (Livewire wire:loading) */
+.livewire-loading-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: linear-gradient(90deg, #6366f1, #10b981, #38bdf8, #6366f1);
+    background-size: 200% 100%;
+    animation: livewireShimmer 1.2s infinite linear;
+    z-index: 30;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+}
+
+.livewire-loading-bar.active {
+    opacity: 1;
+}
+
+@keyframes livewireShimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* Row Flash Highlight when added or updated (Livewire wire:highlight / dirty flash) */
+@keyframes livewireFlashRow {
+    0% {
+        background-color: rgba(16, 185, 129, 0.28) !important;
+        box-shadow: inset 4px 0 0 0 #10b981;
+    }
+    50% {
+        background-color: rgba(16, 185, 129, 0.12) !important;
+        box-shadow: inset 4px 0 0 0 #10b981;
+    }
+    100% {
+        background-color: transparent;
+        box-shadow: inset 0 0 0 0 transparent;
+    }
+}
+
+.livewire-row-highlight {
+    animation: livewireFlashRow 2.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Row Smooth Exit Animation on delete */
+@keyframes livewireExitRow {
+    0% {
+        opacity: 1;
+        transform: translateX(0);
+        background-color: rgba(244, 63, 94, 0.15) !important;
+    }
+    100% {
+        opacity: 0;
+        transform: translateX(-24px);
+        background-color: rgba(244, 63, 94, 0.25) !important;
+    }
+}
+
+.livewire-row-delete {
+    animation: livewireExitRow 0.3s ease-out forwards;
+    pointer-events: none;
+}
+
+/* Livewire Component Badge Pill */
+.livewire-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.625rem;
+    border-radius: 0.75rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.025em;
+    background: #eef2ff;
+    color: #4f46e5;
+    border: 1px solid #c7d2fe;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.livewire-pill:hover {
+    background: #e0e7ff;
+    border-color: #a5b4fc;
+}
+
+.livewire-pill .livewire-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    background-color: #10b981;
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6);
+    animation: pulseDot 2s infinite;
+}
+
+
 
