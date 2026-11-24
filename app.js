@@ -70,7 +70,9 @@ let selectedRekapIds = new Set();
 let lastRenderedRekapList = [];
 let currentBulkDeleteTarget = null; // 'karyawan' or 'rekap'
 
-// State untuk QR Scanner & Badges (Mobile & Desktop)
+// State untuk Mode Absensi Terpadu ('manual' | 'qr' | 'face') & Scanner
+let currentAbsensiMode = 'manual';
+let availableCameras = [];
 let html5QrScanner = null;
 let isScannerRunning = false;
 let currentFacingMode = "environment"; // default kamera belakang pada mobile
@@ -81,6 +83,22 @@ let lastScanTimestamp = 0;
 const SCAN_COOLDOWN_MS = 2500;
 let liveClockInterval = null;
 let currentSelectedQRItem = null;
+
+// State untuk Face ID (Pengenalan Wajah)
+const FACE_API_MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
+let faceModelsLoaded = false;
+let faceModelsLoadingPromise = null;
+let faceStream = null;
+let isFaceCameraRunning = false;
+let faceFacingMode = 'user'; // default kamera depan untuk Face ID
+let currentFaceSubMode = 'scan'; // 'scan' | 'enroll'
+let faceDetectTimer = null;
+let faceMatcher = null;
+let lastFaceCandidateName = null;
+let faceCandidateStreak = 0;
+let faceCooldownMap = new Map();
+const FACE_COOLDOWN_MS = 5000;
+const FACE_MATCH_THRESHOLD = 0.48;
 
 // State untuk Mode Input Nama Caberawit (Database vs Ketik Mandiri)
 let currentAbsenInputMode = 'select'; // 'select' or 'manual'
@@ -235,6 +253,7 @@ function setAbsensiPreviewFilter(status) {
 
 function renderInputAbsensiPreviewTable() {
     const tbody = document.getElementById('absensi-preview-table-body');
+    const cardList = document.getElementById('absensi-preview-card-list');
     const emptyState = document.getElementById('absensi-preview-empty');
     const countEl = document.getElementById('absensi-preview-count');
     if (!tbody) return;
@@ -256,6 +275,7 @@ function renderInputAbsensiPreviewTable() {
 
     if (list.length === 0) {
         tbody.innerHTML = '';
+        if (cardList) cardList.innerHTML = '';
         if (emptyState) {
             emptyState.classList.remove('hidden');
             emptyState.classList.add('flex');
@@ -301,6 +321,31 @@ function renderInputAbsensiPreviewTable() {
             </td>
         </tr>
     `}).join('');
+
+    if (cardList) {
+        cardList.innerHTML = list.map(item => {
+            const isNew = LivewireEngine.isHighlighted(item.id);
+            const highlightClass = isNew ? 'livewire-row-highlight' : '';
+            return `
+            <div data-livewire-id="${item.id}" class="p-3 flex items-center justify-between gap-2 ${highlightClass}">
+                <div class="min-w-0">
+                    <p class="text-xs font-bold text-surface-900 truncate">${escapeHtml(item.nama)}</p>
+                    <p class="text-[11px] text-surface-400 font-mono">${escapeHtml(item.jam || '-')}</p>
+                </div>
+                <div class="flex items-center gap-1.5 shrink-0">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold badge-${(item.status || '').toLowerCase()}">
+                        ${getStatusIcon(item.status)} ${escapeHtml(item.status)}
+                    </span>
+                    <button type="button" onclick="openEditModal('${item.id}')" class="p-1 text-surface-400 hover:text-primary-600" title="Edit">
+                        <i class="fa-solid fa-pen-to-square text-xs"></i>
+                    </button>
+                    <button type="button" onclick="deleteAbsensi('${item.id}')" class="p-1 text-surface-400 hover:text-rose-600" title="Hapus">
+                        <i class="fa-solid fa-trash-can text-xs"></i>
+                    </button>
+                </div>
+            </div>
+        `}).join('');
+    }
 }
 
 
@@ -639,6 +684,7 @@ function setupRealtimeDbListeners() {
         updateKaryawanDatalist();
         updateQuickQRCaberawitSelect();
         if (typeof populateRaportMuridSelect === 'function') populateRaportMuridSelect();
+        if (typeof refreshFaceIDDataUI === 'function') refreshFaceIDDataUI();
         refreshCaberawitDetailIfOpen();
     });
 }
@@ -701,6 +747,7 @@ function setupFirestoreListeners() {
         updateKaryawanDatalist();
         updateQuickQRCaberawitSelect();
         if (typeof populateRaportMuridSelect === 'function') populateRaportMuridSelect();
+        if (typeof refreshFaceIDDataUI === 'function') refreshFaceIDDataUI();
         refreshCaberawitDetailIfOpen();
     });
 }
@@ -751,6 +798,7 @@ function loadFromLocalStorage() {
         updateQuickQRCaberawitSelect();
         renderRecentScansFeed();
         if (typeof populateRaportMuridSelect === 'function') populateRaportMuridSelect();
+        if (typeof refreshFaceIDDataUI === 'function') refreshFaceIDDataUI();
     } catch (e) {}
 }
 
@@ -765,6 +813,7 @@ function ensureDataAvailable() {
     updateQuickQRCaberawitSelect();
     renderRecentScansFeed();
     if (typeof populateRaportMuridSelect === 'function') populateRaportMuridSelect();
+    if (typeof refreshFaceIDDataUI === 'function') refreshFaceIDDataUI();
 }
 
 
@@ -2517,10 +2566,20 @@ function toggleSidebar() {
     }
 }
 
-function navigateTo(page) {
-    // Jika keluar dari halaman scan, matikan stream kamera agar hemat baterai
-    if (currentPage === 'scan' && page !== 'scan') {
+function navigateTo(page, subMode = null) {
+    // Normalisasi alias halaman scan / face ke menu terpadu absensi
+    if (page === 'scan') {
+        page = 'absensi';
+        subMode = subMode || 'qr';
+    } else if (page === 'face') {
+        page = 'absensi';
+        subMode = subMode || 'face';
+    }
+
+    // Jika keluar dari halaman absensi, matikan kamera QR & Face ID agar hemat baterai
+    if (currentPage === 'absensi' && page !== 'absensi') {
         stopQRScanner();
+        stopFaceIDCamera();
     }
 
     currentPage = page;
@@ -2540,8 +2599,7 @@ function navigateTo(page) {
 
     const titles = {
         dashboard: { title: 'Dashboard', subtitle: 'Ringkasan data kehadiran hari ini' },
-        absensi: { title: 'Input Absensi', subtitle: 'Tambahkan data kehadiran peserta caberawit' },
-        scan: { title: 'Scan QR Absensi', subtitle: 'Pindai barcode QR untuk absensi otomatis (Mobile & Desktop)' },
+        absensi: { title: 'Absensi Caberawit', subtitle: 'Pilih mode absensi: Manual, Scan QR, atau Face ID' },
         rekap: { title: 'Rekap Data', subtitle: 'Filter dan kelola data absensi' },
         karyawan: { title: 'Data Caberawit', subtitle: 'Kelola data peserta caberawit terdaftar' },
         'caberawit-detail': { title: 'Detail Caberawit', subtitle: 'Biodata, kehadiran, raport & pencapaian individu' },
@@ -2554,10 +2612,8 @@ function navigateTo(page) {
     document.getElementById('page-title').textContent = info.title;
     document.getElementById('page-subtitle').textContent = info.subtitle;
 
-    if (page === 'scan') {
-        initQRScannerPage();
-    } else if (page === 'absensi') {
-        renderInputAbsensiPreviewTable();
+    if (page === 'absensi') {
+        switchAbsensiMode(subMode || currentAbsensiMode || 'manual');
     } else if (page === 'rekap') {
         filterRekapData();
     } else if (page === 'karyawan') {
@@ -2574,6 +2630,45 @@ function navigateTo(page) {
     const sidebar = document.getElementById('sidebar');
     if (window.innerWidth < 1024 && sidebar && !sidebar.classList.contains('-translate-x-full')) {
         toggleSidebar();
+    }
+}
+
+function switchAbsensiMode(mode) {
+    const validModes = ['manual', 'qr', 'face'];
+    if (!validModes.includes(mode)) mode = 'manual';
+
+    if (currentAbsensiMode === 'qr' && mode !== 'qr') {
+        stopQRScanner();
+    }
+    if (currentAbsensiMode === 'face' && mode !== 'face') {
+        stopFaceIDCamera();
+    }
+
+    currentAbsensiMode = mode;
+
+    // Update mode selector button styles
+    validModes.forEach(m => {
+        const btn = document.getElementById(`absen-mode-btn-${m}`);
+        const panel = document.getElementById(`absensi-panel-${m}`);
+        if (btn) {
+            if (m === mode) {
+                btn.className = 'absen-mode-btn flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg text-[11px] sm:text-xs font-bold transition-all bg-white text-primary-700 shadow-sm';
+            } else {
+                btn.className = 'absen-mode-btn flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg text-[11px] sm:text-xs font-semibold transition-all text-surface-600 hover:text-surface-900';
+            }
+        }
+        if (panel) {
+            if (m === mode) panel.classList.remove('hidden');
+            else panel.classList.add('hidden');
+        }
+    });
+
+    if (mode === 'manual') {
+        renderInputAbsensiPreviewTable();
+    } else if (mode === 'qr') {
+        initQRScannerPage();
+    } else if (mode === 'face') {
+        initFaceIDMode();
     }
 }
 
@@ -2674,12 +2769,13 @@ const TOUR_STEPS = [
         pointerText: '👇 Manajemen Santri'
     },
     {
-        page: 'scan',
-        targetSelector: '#qr-reader',
-        title: '📷 5. Pemindai QR Absensi Otomatis',
-        desc: 'Saat KBM dimulai, cukup sorot kartu QR santri ke kotak kamera ini. Sistem akan berbunyi "beep" dan otomatis mencatat santri Hadir tanpa perlu mengetik manual!',
+        page: 'absensi',
+        absensiMode: 'qr',
+        targetSelector: '#absen-mode-btn-qr',
+        title: '📷 5. Absensi Terpadu (Manual, Scan QR & Face ID)',
+        desc: 'Semua mode absensi (Manual, Scan QR Barcode, dan Face ID Wajah) kini digabung dalam satu menu Absensi agar lebih rapi. Pilih mode sesuai kebutuhan!',
         duration: 7000,
-        pointerText: '👇 Arahkan Kartu ke Sini'
+        pointerText: '👇 Pilih Mode Absensi'
     },
     {
         page: 'rekap',
@@ -2766,7 +2862,9 @@ function renderTourStep() {
 
     // Pindah halaman jika diperlukan
     if (currentPage !== step.page) {
-        navigateTo(step.page);
+        navigateTo(step.page, step.absensiMode || null);
+    } else if (step.page === 'absensi' && step.absensiMode && currentAbsensiMode !== step.absensiMode) {
+        switchAbsensiMode(step.absensiMode);
     }
 
     // Tangani drawer sidebar pada smartphone
@@ -3132,8 +3230,8 @@ async function startQRScanner() {
             statusBadge.className = 'text-xs font-semibold text-emerald-600 animate-pulse';
         }
         if (btnToggle) {
-            btnToggle.innerHTML = '<i class="fa-solid fa-stop"></i><span>Hentikan Kamera</span>';
-            btnToggle.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 transition-colors shadow-sm';
+            btnToggle.innerHTML = '<i id="btn-toggle-camera-icon" class="fa-solid fa-stop text-xs"></i><span id="btn-toggle-camera-text">Hentikan Kamera</span>';
+            btnToggle.className = 'flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-lg shadow-rose-500/25 transition-all';
         }
     } catch (err) {
         console.warn('Kamera scanner start warning:', err);
@@ -3145,8 +3243,8 @@ async function startQRScanner() {
             statusBadge.className = 'text-xs font-semibold text-surface-400';
         }
         if (btnToggle) {
-            btnToggle.innerHTML = '<i class="fa-solid fa-play"></i><span>Nyalakan Kamera</span>';
-            btnToggle.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition-colors shadow-sm';
+            btnToggle.innerHTML = '<i id="btn-toggle-camera-icon" class="fa-solid fa-play text-xs"></i><span id="btn-toggle-camera-text">Nyalakan Kamera</span>';
+            btnToggle.className = 'flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-lg shadow-emerald-500/25 transition-all';
         }
     }
 }
@@ -3173,8 +3271,8 @@ async function stopQRScanner() {
         statusBadge.className = 'text-xs font-semibold text-surface-400';
     }
     if (btnToggle) {
-        btnToggle.innerHTML = '<i class="fa-solid fa-play"></i><span>Nyalakan Kamera</span>';
-        btnToggle.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition-colors shadow-sm';
+        btnToggle.innerHTML = '<i id="btn-toggle-camera-icon" class="fa-solid fa-play text-xs"></i><span id="btn-toggle-camera-text">Nyalakan Kamera</span>';
+        btnToggle.className = 'flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-lg shadow-emerald-500/25 transition-all';
     }
 }
 
@@ -3207,13 +3305,12 @@ async function onCameraDeviceSelected(cameraId) {
 function toggleScanSound() {
     scanSoundEnabled = !scanSoundEnabled;
     const icon = document.getElementById('sound-icon');
+    const faceIcon = document.getElementById('face-sound-icon');
     const text = document.getElementById('sound-text');
-    if (icon) {
-        icon.className = scanSoundEnabled ? 'fa-solid fa-volume-high' : 'fa-solid fa-volume-xmark';
-    }
-    if (text) {
-        text.textContent = scanSoundEnabled ? 'Suara Aktif' : 'Suara Hening';
-    }
+    const cls = scanSoundEnabled ? 'fa-solid fa-volume-high text-xs text-emerald-600' : 'fa-solid fa-volume-xmark text-xs text-surface-400';
+    if (icon) icon.className = cls;
+    if (faceIcon) faceIcon.className = cls;
+    if (text) text.textContent = scanSoundEnabled ? 'Suara Aktif' : 'Suara Hening';
     showToast(scanSoundEnabled ? 'Suara scanner diaktifkan' : 'Suara scanner dimatikan', 'info');
 }
 
@@ -3247,12 +3344,12 @@ function playScanBeep(type = 'success') {
     } catch (e) {}
 }
 
-function updateScanFeedback(type, title, desc, badgeText) {
-    const box = document.getElementById('scan-feedback-box');
-    const icon = document.getElementById('scan-feedback-icon');
-    const titleEl = document.getElementById('scan-feedback-title');
-    const descEl = document.getElementById('scan-feedback-desc');
-    const badgeEl = document.getElementById('scan-feedback-badge');
+function updateFeedbackBanner(prefix, defaultIconClass, type, title, desc, badgeText) {
+    const box = document.getElementById(`${prefix}-feedback-box`);
+    const icon = document.getElementById(`${prefix}-feedback-icon`);
+    const titleEl = document.getElementById(`${prefix}-feedback-title`);
+    const descEl = document.getElementById(`${prefix}-feedback-desc`);
+    const badgeEl = document.getElementById(`${prefix}-feedback-badge`);
 
     if (titleEl) titleEl.textContent = title;
     if (descEl) descEl.textContent = desc;
@@ -3268,22 +3365,30 @@ function updateScanFeedback(type, title, desc, badgeText) {
 
     if (box && icon && badgeEl) {
         if (type === 'success') {
-            box.className = 'p-4 mx-6 mb-6 rounded-2xl bg-emerald-50/90 border border-emerald-200 transition-all duration-300 ring-2 ring-emerald-500/20';
+            box.className = 'p-4 mx-4 sm:mx-6 mb-6 rounded-2xl bg-emerald-50/90 border border-emerald-200 transition-all duration-300 ring-2 ring-emerald-500/20';
             icon.className = 'w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center text-lg shrink-0 shadow-sm';
             icon.innerHTML = '<i class="fa-solid fa-check"></i>';
-            badgeEl.className = 'px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-800';
+            badgeEl.className = 'px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-800 shrink-0';
         } else if (type === 'warning') {
-            box.className = 'p-4 mx-6 mb-6 rounded-2xl bg-amber-50/90 border border-amber-200 transition-all duration-300 ring-2 ring-amber-500/20';
+            box.className = 'p-4 mx-4 sm:mx-6 mb-6 rounded-2xl bg-amber-50/90 border border-amber-200 transition-all duration-300 ring-2 ring-amber-500/20';
             icon.className = 'w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center text-lg shrink-0 shadow-sm';
             icon.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
-            badgeEl.className = 'px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 text-amber-800';
+            badgeEl.className = 'px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 text-amber-800 shrink-0';
         } else {
-            box.className = 'p-4 mx-6 mb-6 rounded-2xl bg-surface-50 border border-surface-200 transition-all duration-300';
-            icon.className = 'w-10 h-10 rounded-xl bg-surface-200 text-surface-600 flex items-center justify-center text-lg shrink-0';
-            icon.innerHTML = '<i class="fa-solid fa-qrcode"></i>';
+            box.className = 'p-4 mx-4 sm:mx-6 mb-6 rounded-2xl bg-surface-50 border border-surface-200 transition-all duration-300';
+            icon.className = 'w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center text-lg shrink-0';
+            icon.innerHTML = `<i class="${defaultIconClass}"></i>`;
             badgeEl.classList.add('hidden');
         }
     }
+}
+
+function updateScanFeedback(type, title, desc, badgeText) {
+    updateFeedbackBanner('scan', 'fa-solid fa-qrcode', type, title, desc, badgeText);
+}
+
+function updateFaceFeedback(type, title, desc, badgeText) {
+    updateFeedbackBanner('face', 'fa-solid fa-face-smile', type, title, desc, badgeText);
 }
 
 function onQRScanError(errorMessage) {
@@ -3340,32 +3445,23 @@ function parseScannedQR(text) {
     return { nama, role, caberawitId };
 }
 
-async function processAttendanceScan(rawText) {
-    const parsed = parseScannedQR(rawText);
-    if (!parsed || !parsed.nama) {
-        playScanBeep('warning');
-        updateScanFeedback('warning', 'Format QR Tidak Dikenal', 'QR Code tidak memuat identitas atau nama yang valid.', 'Gagal');
-        return;
-    }
-
-    const { nama, role } = parsed;
+/**
+ * Mencatat absensi otomatis (dipakai bersama oleh Scan QR dan Face ID).
+ * @returns {Promise<{ok: boolean, duplicate?: boolean, nowTime?: string, today?: string}>}
+ */
+async function recordAutoAttendance(nama, role, sourceLabel, caberawitId = '') {
     const today = formatDateISO(new Date());
     const nowTime = formatCurrentTime();
 
-    // Cek apakah peserta sudah hadir hari ini
-    const alreadyAttended = allAbsensiData.some(item => 
-        (item.nama || '').trim().toLowerCase() === nama.trim().toLowerCase() && 
+    const alreadyAttended = allAbsensiData.some(item =>
+        (item.nama || '').trim().toLowerCase() === nama.trim().toLowerCase() &&
         item.tanggal === today
     );
 
     if (alreadyAttended) {
-        playScanBeep('warning');
-        updateScanFeedback('warning', `${nama} Sudah Hadir`, `Telah tercatat absensi hari ini pada tanggal ${today}.`, 'Duplikat');
-        showToast(`⚠️ ${nama} sudah tercatat hadir hari ini!`, 'warning');
-        return;
+        return { ok: false, duplicate: true, today };
     }
 
-    // Buat data absensi baru
     const recordId = `abs_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const newRecord = {
         id: recordId,
@@ -3373,11 +3469,10 @@ async function processAttendanceScan(rawText) {
         tanggal: today,
         jam: nowTime,
         status: 'Hadir',
-        keterangan: 'Absensi via Barcode QR Scanner',
+        keterangan: sourceLabel,
         timestamp: Date.now()
     };
 
-    // Sinkronisasi otomatis ke Firebase (Realtime Database atau Firestore)
     try {
         if (isFirebaseConnected) {
             if (activeEngine === 'rtdb' && rtdb) {
@@ -3390,7 +3485,6 @@ async function processAttendanceScan(rawText) {
         console.warn('Firebase attendance sync warning:', err);
     }
 
-    // Simpan ke state lokal & localStorage
     allAbsensiData.unshift(newRecord);
     saveToLocalStorage();
 
@@ -3398,7 +3492,7 @@ async function processAttendanceScan(rawText) {
     const existsInRoster = allKaryawanData.some(k => (k.nama || '').trim().toLowerCase() === nama.trim().toLowerCase());
     if (!existsInRoster) {
         const newCaberawit = {
-            id: parsed.caberawitId || `caberawit_${Date.now()}`,
+            id: caberawitId || `caberawit_${Date.now()}`,
             nama: nama,
             jabatan: role || 'Peserta Caberawit',
             email: '',
@@ -3416,19 +3510,41 @@ async function processAttendanceScan(rawText) {
         renderKaryawanTable(allKaryawanData);
         updateKaryawanDatalist();
         updateQuickQRCaberawitSelect();
+        refreshFaceIDDataUI();
     }
 
-    // Bunyikan chime & tampilkan feedback
-    playScanBeep('success');
-    updateScanFeedback('success', `${nama} — BERHASIL!`, `Status: Hadir • Waktu: ${nowTime} WIB`, 'Tersimpan ke Cloud');
-    showToast(`✅ Absensi berhasil: ${nama} (${nowTime})`, 'success');
-
-    // Perbarui counter dan tampilan tabel
     updateStatCards();
     renderAttendanceTable();
+    renderInputAbsensiPreviewTable();
     updateChartData();
     renderRecentScansFeed();
     if (currentPage === 'rekap') filterRekapData();
+    refreshCaberawitDetailIfOpen();
+
+    return { ok: true, nowTime };
+}
+
+async function processAttendanceScan(rawText) {
+    const parsed = parseScannedQR(rawText);
+    if (!parsed || !parsed.nama) {
+        playScanBeep('warning');
+        updateScanFeedback('warning', 'Format QR Tidak Dikenal', 'QR Code tidak memuat identitas atau nama yang valid.', 'Gagal');
+        return;
+    }
+
+    const { nama, role, caberawitId } = parsed;
+    const res = await recordAutoAttendance(nama, role, 'Absensi via Barcode QR Scanner', caberawitId);
+
+    if (res.duplicate) {
+        playScanBeep('warning');
+        updateScanFeedback('warning', `${nama} Sudah Hadir`, `Telah tercatat absensi hari ini pada tanggal ${res.today}.`, 'Duplikat');
+        showToast(`⚠️ ${nama} sudah tercatat hadir hari ini!`, 'warning');
+        return;
+    }
+
+    playScanBeep('success');
+    updateScanFeedback('success', `${nama} — BERHASIL!`, `Status: Hadir • Waktu: ${res.nowTime} WIB`, 'Tersimpan ke Cloud');
+    showToast(`✅ Absensi berhasil: ${nama} (${res.nowTime})`, 'success');
 }
 
 async function handleQRImageUpload(event) {
@@ -3457,15 +3573,18 @@ async function handleQRImageUpload(event) {
 
 function updateLiveClock() {
     const clockEl = document.getElementById('scan-live-clock');
+    const faceClockEl = document.getElementById('face-live-clock');
     const dateEl = document.getElementById('scan-live-date');
-    if (!clockEl && !dateEl) return;
+    if (!clockEl && !faceClockEl && !dateEl) return;
 
     const now = new Date();
     const hours = String(now.getHours()).padStart(2, '0');
     const minutes = String(now.getMinutes()).padStart(2, '0');
     const seconds = String(now.getSeconds()).padStart(2, '0');
+    const timeText = `${hours}:${minutes}:${seconds} WIB`;
 
-    if (clockEl) clockEl.textContent = `${hours}:${minutes}:${seconds} WIB`;
+    if (clockEl) clockEl.textContent = timeText;
+    if (faceClockEl) faceClockEl.textContent = timeText;
     if (dateEl) {
         const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
@@ -3474,40 +3593,692 @@ function updateLiveClock() {
 }
 
 function renderRecentScansFeed() {
-    const container = document.getElementById('today-scans-feed');
-    const countEl = document.getElementById('qr-scanned-count');
-    if (!container) return;
-
     const today = formatDateISO(new Date());
     const todayList = allAbsensiData.filter(d => d.tanggal === today);
-    if (countEl) countEl.textContent = todayList.length;
 
-    if (todayList.length === 0) {
-        container.innerHTML = `
+    const feedHtml = todayList.length === 0
+        ? `
             <div class="text-center py-8 text-surface-400 text-xs">
-                <i class="fa-solid fa-clipboard-user text-2xl mb-2 text-surface-300"></i>
-                <p>Belum ada yang scan hari ini.</p>
+                <i class="fa-solid fa-clipboard-user text-2xl mb-2 text-surface-300 block"></i>
+                <p>Belum ada yang absen hari ini.</p>
             </div>
-        `;
+        `
+        : todayList.slice(0, 15).map(item => `
+            <div class="flex items-center justify-between p-3 rounded-xl bg-surface-50 border border-surface-100 hover:bg-emerald-50/40 transition-colors">
+                <div class="flex items-center gap-3 min-w-0">
+                    <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold shrink-0">
+                        ${getInitials(item.nama)}
+                    </div>
+                    <div class="min-w-0">
+                        <p class="text-xs font-bold text-surface-800 truncate">${escapeHtml(item.nama)}</p>
+                        <p class="text-[11px] text-surface-400 truncate">${escapeHtml(item.jam || '--:--')} WIB • ${escapeHtml(item.keterangan || item.status)}</p>
+                    </div>
+                </div>
+                <span class="text-[10px] font-semibold px-2 py-0.5 rounded-md badge-${(item.status || 'hadir').toLowerCase()} shrink-0">
+                    ${escapeHtml(item.status)}
+                </span>
+            </div>
+        `).join('');
+
+    const qrFeed = document.getElementById('today-scans-feed');
+    const qrCount = document.getElementById('qr-scanned-count');
+    if (qrCount) qrCount.textContent = todayList.length;
+    if (qrFeed) qrFeed.innerHTML = feedHtml;
+
+    const faceFeed = document.getElementById('face-recent-list');
+    const faceCount = document.getElementById('face-scanned-count');
+    if (faceCount) faceCount.textContent = todayList.length;
+    if (faceFeed) faceFeed.innerHTML = feedHtml;
+}
+
+// -----------------------------------------------
+// 17B. FACE ID ATTENDANCE SYSTEM (CLIENT-SIDE AI)
+// -----------------------------------------------
+
+async function initFaceIDMode() {
+    updateLiveClock();
+    if (!liveClockInterval) {
+        liveClockInterval = setInterval(updateLiveClock, 1000);
+    }
+    refreshFaceIDDataUI();
+    renderRecentScansFeed();
+    setFaceSubMode(currentFaceSubMode);
+    if (!isFaceCameraRunning) {
+        await startFaceIDCamera();
+    }
+}
+
+function refreshFaceIDDataUI() {
+    rebuildFaceMatcher();
+    updateFaceEnrollSelect();
+    renderFaceRegisteredList();
+}
+
+function updateFaceEnrollSelect() {
+    const select = document.getElementById('face-enroll-select');
+    if (!select) return;
+    const prev = select.value;
+    select.innerHTML = '<option value="">-- Pilih Caberawit --</option>';
+    allKaryawanData.forEach(item => {
+        const hasFace = Array.isArray(item.faceDescriptor) && item.faceDescriptor.length === 128;
+        const opt = document.createElement('option');
+        opt.value = item.id;
+        opt.textContent = `${item.nama} (${item.jabatan || 'Caberawit'})${hasFace ? ' ✓ Terdaftar' : ''}`;
+        select.appendChild(opt);
+    });
+    if (prev && allKaryawanData.some(k => k.id === prev)) {
+        select.value = prev;
+    }
+}
+
+function renderFaceRegisteredList() {
+    const listEl = document.getElementById('face-registered-list');
+    const countEl = document.getElementById('face-registered-count');
+    if (!listEl) return;
+
+    const registeredUsers = allKaryawanData.filter(k => Array.isArray(k.faceDescriptor) && k.faceDescriptor.length === 128);
+    if (countEl) countEl.textContent = `${registeredUsers.length} / ${allKaryawanData.length}`;
+
+    const q = (document.getElementById('face-list-search')?.value || '').toLowerCase().trim();
+    const filtered = q
+        ? allKaryawanData.filter(k => (k.nama || '').toLowerCase().includes(q) || (k.jabatan || '').toLowerCase().includes(q))
+        : allKaryawanData;
+
+    if (filtered.length === 0) {
+        listEl.innerHTML = '<p class="text-xs text-surface-400 text-center py-6">Tidak ada data caberawit.</p>';
         return;
     }
 
-    container.innerHTML = todayList.slice(0, 15).map(item => `
-        <div class="flex items-center justify-between p-3 rounded-xl bg-surface-50 border border-surface-100 hover:bg-emerald-50/40 transition-colors">
-            <div class="flex items-center gap-3 min-w-0">
-                <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold shrink-0">
-                    ${getInitials(item.nama)}
-                </div>
+    listEl.innerHTML = filtered.map(k => {
+        const hasFace = Array.isArray(k.faceDescriptor) && k.faceDescriptor.length === 128;
+        const avatarHtml = k.faceThumb
+            ? `<img src="${k.faceThumb}" alt="${escapeHtml(k.nama)}" class="w-8 h-8 rounded-full object-cover border border-indigo-200 shrink-0" />`
+            : `<div class="w-8 h-8 rounded-full ${hasFace ? 'bg-indigo-100 text-indigo-700' : 'bg-surface-100 text-surface-500'} flex items-center justify-center text-xs font-bold shrink-0">${getInitials(k.nama)}</div>`;
+
+        return `
+        <div class="p-2.5 rounded-xl border ${hasFace ? 'bg-indigo-50/40 border-indigo-100' : 'bg-surface-50/50 border-surface-100'} flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2.5 min-w-0">
+                ${avatarHtml}
                 <div class="min-w-0">
-                    <p class="text-xs font-bold text-surface-800 truncate">${escapeHtml(item.nama)}</p>
-                    <p class="text-[11px] text-surface-400">${escapeHtml(item.jam || '--:--')} WIB • <span class="text-emerald-600 font-medium">${escapeHtml(item.status)}</span></p>
+                    <p class="text-xs font-bold text-surface-800 truncate">${escapeHtml(k.nama)}</p>
+                    <p class="text-[10px] ${hasFace ? 'text-emerald-600 font-semibold' : 'text-surface-400'}">
+                        ${hasFace ? '✓ Wajah Terdaftar' : 'Belum didaftarkan'}
+                    </p>
                 </div>
             </div>
-            <span class="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 shrink-0">
-                ${escapeHtml(item.status)}
-            </span>
+            <div class="flex items-center gap-1 shrink-0">
+                <button type="button" onclick="openFaceEnrollForUser('${k.id}')"
+                    class="px-2 py-1 rounded-lg text-[10px] font-semibold ${hasFace ? 'bg-white text-indigo-700 border border-indigo-200 hover:bg-indigo-50' : 'bg-indigo-600 text-white hover:bg-indigo-700'} transition-colors">
+                    ${hasFace ? 'Ubah' : 'Daftar'}
+                </button>
+                ${hasFace ? `
+                <button type="button" onclick="deleteUserFaceData('${k.id}')"
+                    class="p-1 rounded-lg text-surface-400 hover:text-rose-600 hover:bg-rose-50 transition-colors" title="Hapus Data Wajah">
+                    <i class="fa-solid fa-trash-can text-[11px]"></i>
+                </button>` : ''}
+            </div>
         </div>
-    `).join('');
+    `}).join('');
+}
+
+function openFaceEnrollForUser(id) {
+    if (currentPage !== 'absensi') {
+        navigateTo('absensi', 'face');
+    } else if (currentAbsensiMode !== 'face') {
+        switchAbsensiMode('face');
+    }
+    setFaceSubMode('enroll');
+    const select = document.getElementById('face-enroll-select');
+    if (select && id) select.value = id;
+}
+
+function setFaceSubMode(subMode) {
+    currentFaceSubMode = subMode === 'enroll' ? 'enroll' : 'scan';
+    const scanBtn = document.getElementById('face-submode-scan');
+    const enrollBtn = document.getElementById('face-submode-enroll');
+    const enrollBar = document.getElementById('face-enroll-bar');
+
+    if (scanBtn && enrollBtn) {
+        if (currentFaceSubMode === 'scan') {
+            scanBtn.className = 'px-2.5 py-1.5 rounded-lg font-bold bg-white text-indigo-700 shadow-xs transition-all';
+            enrollBtn.className = 'px-2.5 py-1.5 rounded-lg font-semibold text-surface-600 hover:text-surface-900 transition-all';
+        } else {
+            enrollBtn.className = 'px-2.5 py-1.5 rounded-lg font-bold bg-white text-indigo-700 shadow-xs transition-all';
+            scanBtn.className = 'px-2.5 py-1.5 rounded-lg font-semibold text-surface-600 hover:text-surface-900 transition-all';
+        }
+    }
+
+    if (enrollBar) {
+        if (currentFaceSubMode === 'enroll') enrollBar.classList.remove('hidden');
+        else enrollBar.classList.add('hidden');
+    }
+
+    lastFaceCandidateName = null;
+    faceCandidateStreak = 0;
+
+    if (currentFaceSubMode === 'enroll') {
+        updateFaceFeedback('default', 'Mode Pendaftaran Wajah', 'Pilih nama caberawit di atas, arahkan wajah ke kamera, lalu klik "Rekam & Simpan Wajah".');
+    } else {
+        const regCount = allKaryawanData.filter(k => Array.isArray(k.faceDescriptor) && k.faceDescriptor.length === 128).length;
+        if (regCount === 0) {
+            updateFaceFeedback('warning', 'Belum Ada Wajah Terdaftar', 'Silakan buka tab "Daftar Wajah" terlebih dahulu untuk mendaftarkan wajah caberawit.', 'Perlu Daftar');
+        } else {
+            updateFaceFeedback('default', 'Siap Memindai Wajah', `${regCount} wajah caberawit siap dikenali secara otomatis.`);
+        }
+    }
+}
+
+async function ensureFaceApiModels() {
+    if (faceModelsLoaded) return true;
+    if (typeof faceapi === 'undefined') {
+        showToast('Library AI Face ID sedang dimuat atau tidak tersedia.', 'error');
+        return false;
+    }
+    if (faceModelsLoadingPromise) return faceModelsLoadingPromise;
+
+    const loadingEl = document.getElementById('face-model-loading');
+    const statusBadge = document.getElementById('face-status-badge');
+    if (loadingEl) loadingEl.classList.remove('hidden');
+    if (statusBadge) {
+        statusBadge.textContent = 'Memuat model AI...';
+        statusBadge.className = 'text-xs font-semibold text-indigo-600 animate-pulse';
+    }
+
+    faceModelsLoadingPromise = (async () => {
+        try {
+            await Promise.all([
+                faceapi.nets.tinyFaceDetector.loadFromUri(FACE_API_MODEL_URL),
+                faceapi.nets.faceLandmark68TinyNet.loadFromUri(FACE_API_MODEL_URL),
+                faceapi.nets.faceRecognitionNet.loadFromUri(FACE_API_MODEL_URL)
+            ]);
+            faceModelsLoaded = true;
+            rebuildFaceMatcher();
+            return true;
+        } catch (err) {
+            console.error('Gagal memuat model Face ID:', err);
+            showToast('Gagal memuat model AI Face ID. Periksa koneksi internet Anda.', 'error');
+            faceModelsLoadingPromise = null;
+            return false;
+        } finally {
+            if (loadingEl) loadingEl.classList.add('hidden');
+        }
+    })();
+
+    return faceModelsLoadingPromise;
+}
+
+function rebuildFaceMatcher() {
+    if (typeof faceapi === 'undefined') {
+        faceMatcher = null;
+        return;
+    }
+    const labeled = [];
+    allKaryawanData.forEach(k => {
+        if (Array.isArray(k.faceDescriptor) && k.faceDescriptor.length === 128) {
+            try {
+                const desc = new Float32Array(k.faceDescriptor);
+                labeled.push(new faceapi.LabeledFaceDescriptors(k.id, [desc]));
+            } catch (e) {}
+        }
+    });
+    faceMatcher = labeled.length > 0 ? new faceapi.FaceMatcher(labeled, FACE_MATCH_THRESHOLD) : null;
+}
+
+async function startFaceIDCamera() {
+    const modelsOk = await ensureFaceApiModels();
+    if (!modelsOk) {
+        const statusBadge = document.getElementById('face-status-badge');
+        if (statusBadge) {
+            statusBadge.textContent = 'Model AI Gagal Dimuat';
+            statusBadge.className = 'text-xs font-semibold text-rose-600';
+        }
+        return;
+    }
+
+    const video = document.getElementById('face-video');
+    const placeholder = document.getElementById('face-placeholder');
+    const statusBadge = document.getElementById('face-status-badge');
+    const toggleBtn = document.getElementById('btn-toggle-face-camera');
+
+    if (!video || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showToast('Kamera tidak didukung di browser ini. Gunakan fitur Unggah/Absen Foto.', 'warning');
+        return;
+    }
+
+    try {
+        stopFaceIDCamera(false);
+        if (statusBadge) {
+            statusBadge.textContent = 'Mengaktifkan kamera...';
+            statusBadge.className = 'text-xs font-semibold text-blue-600 animate-pulse';
+        }
+
+        faceStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: faceFacingMode, width: { ideal: 640 }, height: { ideal: 480 } },
+            audio: false
+        });
+        video.srcObject = faceStream;
+        await video.play();
+
+        isFaceCameraRunning = true;
+        if (placeholder) placeholder.classList.add('hidden');
+        if (statusBadge) {
+            statusBadge.textContent = currentFaceSubMode === 'enroll' ? 'Siap Rekam Wajah' : 'Mendeteksi Wajah...';
+            statusBadge.className = 'text-xs font-semibold text-emerald-600 animate-pulse';
+        }
+        if (toggleBtn) {
+            toggleBtn.innerHTML = '<i class="fa-solid fa-stop text-xs"></i><span>Hentikan Kamera</span>';
+            toggleBtn.className = 'flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-lg shadow-rose-500/25 transition-all';
+        }
+
+        scheduleFaceDetectionLoop();
+    } catch (err) {
+        console.warn('Kamera Face ID error:', err);
+        isFaceCameraRunning = false;
+        if (placeholder) placeholder.classList.remove('hidden');
+        if (statusBadge) {
+            statusBadge.textContent = 'Izin Kamera Ditolak / Tidak Tersedia';
+            statusBadge.className = 'text-xs font-semibold text-surface-400';
+        }
+        showToast('Tidak dapat membuka kamera Face ID. Pastikan izin kamera diberikan.', 'warning');
+    }
+}
+
+function stopFaceIDCamera(updateUi = true) {
+    if (faceDetectTimer) {
+        clearTimeout(faceDetectTimer);
+        faceDetectTimer = null;
+    }
+    if (faceStream) {
+        try {
+            faceStream.getTracks().forEach(t => t.stop());
+        } catch (e) {}
+        faceStream = null;
+    }
+    const video = document.getElementById('face-video');
+    if (video) video.srcObject = null;
+
+    const canvas = document.getElementById('face-overlay-canvas');
+    if (canvas) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    isFaceCameraRunning = false;
+
+    if (updateUi) {
+        const placeholder = document.getElementById('face-placeholder');
+        const statusBadge = document.getElementById('face-status-badge');
+        const toggleBtn = document.getElementById('btn-toggle-face-camera');
+        if (placeholder) placeholder.classList.remove('hidden');
+        if (statusBadge) {
+            statusBadge.textContent = 'Kamera Dimatikan';
+            statusBadge.className = 'text-xs font-semibold text-surface-400';
+        }
+        if (toggleBtn) {
+            toggleBtn.innerHTML = '<i class="fa-solid fa-play text-xs"></i><span>Aktifkan Kamera</span>';
+            toggleBtn.className = 'flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-lg shadow-indigo-500/25 transition-all';
+        }
+    }
+}
+
+async function toggleFaceIDCamera() {
+    if (isFaceCameraRunning) {
+        stopFaceIDCamera();
+    } else {
+        await startFaceIDCamera();
+    }
+}
+
+async function switchFaceCameraFacing() {
+    faceFacingMode = faceFacingMode === 'user' ? 'environment' : 'user';
+    if (isFaceCameraRunning) {
+        await startFaceIDCamera();
+    }
+    showToast(`Kamera Face ID beralih ke lensa ${faceFacingMode === 'user' ? 'Depan' : 'Belakang'}.`, 'info');
+}
+
+function scheduleFaceDetectionLoop() {
+    if (!isFaceCameraRunning) return;
+    faceDetectTimer = setTimeout(async () => {
+        await runFaceDetectionFrame();
+        if (isFaceCameraRunning) scheduleFaceDetectionLoop();
+    }, 260);
+}
+
+async function runFaceDetectionFrame() {
+    if (!isFaceCameraRunning || !faceModelsLoaded || typeof faceapi === 'undefined') return;
+    const video = document.getElementById('face-video');
+    const canvas = document.getElementById('face-overlay-canvas');
+    if (!video || !canvas || video.readyState < 2 || !video.videoWidth) return;
+
+    const displaySize = { width: video.videoWidth, height: video.videoHeight };
+    if (canvas.width !== displaySize.width || canvas.height !== displaySize.height) {
+        canvas.width = displaySize.width;
+        canvas.height = displaySize.height;
+    }
+
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    try {
+        const detectorOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 256, scoreThreshold: 0.52 });
+
+        if (currentFaceSubMode === 'enroll') {
+            const det = await faceapi.detectSingleFace(video, detectorOptions).withFaceLandmarks(true);
+            if (det) {
+                const box = det.detection.box;
+                drawFaceBox(ctx, box, 'Wajah Terdeteksi — Siap Rekam', '#6366f1');
+            }
+            return;
+        }
+
+        const results = await faceapi
+            .detectAllFaces(video, detectorOptions)
+            .withFaceLandmarks(true)
+            .withFaceDescriptors();
+
+        if (!results || results.length === 0) {
+            lastFaceCandidateName = null;
+            faceCandidateStreak = 0;
+            return;
+        }
+
+        for (const res of results) {
+            const box = res.detection.box;
+            if (!faceMatcher) {
+                drawFaceBox(ctx, box, 'Belum Ada Data Wajah', '#f59e0b');
+                continue;
+            }
+
+            const bestMatch = faceMatcher.findBestMatch(res.descriptor);
+            if (bestMatch && bestMatch.label !== 'unknown') {
+                const user = allKaryawanData.find(k => k.id === bestMatch.label);
+                if (!user) continue;
+                const confidence = Math.max(0, Math.min(99, Math.round((1 - bestMatch.distance) * 100)));
+                drawFaceBox(ctx, box, `${user.nama} (${confidence}%)`, '#10b981');
+
+                if (lastFaceCandidateName === user.id) {
+                    faceCandidateStreak++;
+                } else {
+                    lastFaceCandidateName = user.id;
+                    faceCandidateStreak = 1;
+                }
+
+                // Konfirmasi 2 frame berturut-turut agar tidak salah deteksi
+                if (faceCandidateStreak >= 2) {
+                    const lastTime = faceCooldownMap.get(user.id) || 0;
+                    const now = Date.now();
+                    if ((now - lastTime) >= FACE_COOLDOWN_MS) {
+                        faceCooldownMap.set(user.id, now);
+                        faceCandidateStreak = 0;
+                        await processFaceAttendance(user, confidence);
+                    }
+                }
+            } else {
+                lastFaceCandidateName = null;
+                faceCandidateStreak = 0;
+                drawFaceBox(ctx, box, 'Wajah Tidak Dikenal', '#ef4444');
+            }
+        }
+    } catch (err) {
+        console.warn('Face detection frame warning:', err);
+    }
+}
+
+function drawFaceBox(ctx, box, label, color) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(box.x, box.y, box.width, box.height);
+
+    ctx.font = 'bold 13px Inter, sans-serif';
+    const textWidth = ctx.measureText(label).width;
+    const labelY = Math.max(24, box.y - 6);
+    ctx.fillStyle = color;
+    ctx.fillRect(box.x, labelY - 20, textWidth + 14, 22);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(label, box.x + 7, labelY - 5);
+}
+
+async function processFaceAttendance(user, confidence) {
+    const res = await recordAutoAttendance(user.nama, user.jabatan, `Absensi via Face ID (${confidence}%)`, user.id);
+    if (res.duplicate) {
+        playScanBeep('warning');
+        updateFaceFeedback('warning', `${user.nama} Sudah Hadir`, `Wajah cocok (${confidence}%), sudah tercatat hadir pada ${res.today}.`, 'Duplikat');
+        showToast(`⚠️ ${user.nama} sudah tercatat hadir hari ini!`, 'warning');
+        return;
+    }
+
+    playScanBeep('success');
+    updateFaceFeedback('success', `${user.nama} — HADIR!`, `Terverifikasi via Face ID (${confidence}%) • Pukul ${res.nowTime} WIB`, 'Terverifikasi');
+    showToast(`✅ Face ID Berhasil: ${user.nama} (${res.nowTime})`, 'success');
+}
+
+function createFaceThumbnailFromSource(sourceEl, box) {
+    try {
+        const c = document.createElement('canvas');
+        c.width = 96;
+        c.height = 96;
+        const ctx = c.getContext('2d');
+        const pad = box.width * 0.2;
+        const sx = Math.max(0, box.x - pad);
+        const sy = Math.max(0, box.y - pad);
+        const sw = Math.min((sourceEl.videoWidth || sourceEl.width) - sx, box.width + pad * 2);
+        const sh = Math.min((sourceEl.videoHeight || sourceEl.height) - sy, box.height + pad * 2);
+        ctx.drawImage(sourceEl, sx, sy, sw, sh, 0, 0, 96, 96);
+        return c.toDataURL('image/jpeg', 0.7);
+    } catch (e) {
+        return '';
+    }
+}
+
+async function saveFaceDescriptorForUser(userId, descriptorArray, thumbDataUrl) {
+    const idx = allKaryawanData.findIndex(k => k.id === userId);
+    if (idx === -1) return;
+
+    const payload = {
+        faceDescriptor: descriptorArray,
+        faceThumb: thumbDataUrl || allKaryawanData[idx].faceThumb || '',
+        faceUpdatedAt: Date.now()
+    };
+
+    allKaryawanData[idx] = { ...allKaryawanData[idx], ...payload };
+    saveKaryawanToLocalStorage();
+
+    if (isFirebaseConnected) {
+        if (activeEngine === 'rtdb' && rtdb) {
+            await rtdb.ref(`karyawan/${userId}`).update(payload).catch(() => {});
+        } else if (activeEngine === 'firestore' && db) {
+            await db.collection('karyawan').doc(userId).update(payload).catch(() => {});
+        }
+    }
+
+    refreshFaceIDDataUI();
+    refreshCaberawitDetailIfOpen();
+}
+
+async function captureAndEnrollFace() {
+    const userId = document.getElementById('face-enroll-select')?.value;
+    if (!userId) {
+        showToast('Pilih nama caberawit terlebih dahulu.', 'warning');
+        return;
+    }
+
+    const modelsOk = await ensureFaceApiModels();
+    if (!modelsOk) return;
+
+    const video = document.getElementById('face-video');
+    if (!isFaceCameraRunning || !video || video.readyState < 2) {
+        showToast('Aktifkan kamera terlebih dahulu atau gunakan tombol "Dari Foto".', 'warning');
+        return;
+    }
+
+    const btn = document.getElementById('btn-capture-enroll-face');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Memproses...</span>';
+    }
+
+    try {
+        const det = await faceapi
+            .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }))
+            .withFaceLandmarks(true)
+            .withFaceDescriptor();
+
+        if (!det) {
+            playScanBeep('warning');
+            showToast('Wajah belum terbaca jelas. Posisikan wajah di tengah bingkai dengan cahaya cukup.', 'warning');
+            return;
+        }
+
+        const user = allKaryawanData.find(k => k.id === userId);
+        const descriptorArray = Array.from(det.descriptor);
+        const thumb = createFaceThumbnailFromSource(video, det.detection.box);
+
+        await saveFaceDescriptorForUser(userId, descriptorArray, thumb);
+
+        playScanBeep('success');
+        updateFaceFeedback('success', `Wajah ${user ? user.nama : ''} Tersimpan!`, 'Data Face ID siap digunakan untuk absensi otomatis.', 'Terdaftar');
+        showToast(`✅ Data wajah ${user ? user.nama : ''} berhasil disimpan!`, 'success');
+        setFaceSubMode('scan');
+    } catch (err) {
+        console.error('Enroll face error:', err);
+        showToast('Terjadi kesalahan saat merekam wajah.', 'error');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-camera"></i><span>Rekam & Simpan Wajah</span>';
+        }
+    }
+}
+
+async function handleFaceEnrollFromFile(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+
+    const userId = document.getElementById('face-enroll-select')?.value;
+    if (!userId) {
+        showToast('Pilih nama caberawit terlebih dahulu sebelum mengunggah foto.', 'warning');
+        event.target.value = '';
+        return;
+    }
+
+    const modelsOk = await ensureFaceApiModels();
+    if (!modelsOk) {
+        event.target.value = '';
+        return;
+    }
+
+    try {
+        showToast('Menganalisis wajah dari foto...', 'info');
+        const img = await faceapi.bufferToImage(file);
+        const det = await faceapi
+            .detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.45 }))
+            .withFaceLandmarks(true)
+            .withFaceDescriptor();
+
+        if (!det) {
+            playScanBeep('warning');
+            showToast('Wajah tidak ditemukan di foto tersebut. Gunakan foto close-up yang jelas.', 'warning');
+            event.target.value = '';
+            return;
+        }
+
+        const user = allKaryawanData.find(k => k.id === userId);
+        const descriptorArray = Array.from(det.descriptor);
+        const thumb = createFaceThumbnailFromSource(img, det.detection.box);
+        await saveFaceDescriptorForUser(userId, descriptorArray, thumb);
+
+        playScanBeep('success');
+        updateFaceFeedback('success', `Wajah ${user ? user.nama : ''} Tersimpan!`, 'Berhasil didaftarkan dari foto.', 'Terdaftar');
+        showToast(`✅ Wajah ${user ? user.nama : ''} berhasil didaftarkan dari foto!`, 'success');
+        setFaceSubMode('scan');
+    } catch (err) {
+        console.error('Enroll from file error:', err);
+        showToast('Gagal memproses foto wajah.', 'error');
+    } finally {
+        event.target.value = '';
+    }
+}
+
+async function handleFaceScanFromFile(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+
+    const modelsOk = await ensureFaceApiModels();
+    if (!modelsOk) {
+        event.target.value = '';
+        return;
+    }
+
+    rebuildFaceMatcher();
+    if (!faceMatcher) {
+        showToast('Belum ada data wajah terdaftar. Daftarkan wajah caberawit terlebih dahulu.', 'warning');
+        event.target.value = '';
+        return;
+    }
+
+    try {
+        showToast('Mencocokkan wajah pada foto...', 'info');
+        const img = await faceapi.bufferToImage(file);
+        const det = await faceapi
+            .detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.45 }))
+            .withFaceLandmarks(true)
+            .withFaceDescriptor();
+
+        if (!det) {
+            playScanBeep('warning');
+            updateFaceFeedback('warning', 'Wajah Tidak Terbaca', 'Foto tidak menampilkan wajah dengan jelas.', 'Gagal');
+            event.target.value = '';
+            return;
+        }
+
+        const bestMatch = faceMatcher.findBestMatch(det.descriptor);
+        if (bestMatch && bestMatch.label !== 'unknown') {
+            const user = allKaryawanData.find(k => k.id === bestMatch.label);
+            if (user) {
+                const confidence = Math.max(0, Math.min(99, Math.round((1 - bestMatch.distance) * 100)));
+                await processFaceAttendance(user, confidence);
+            }
+        } else {
+            playScanBeep('warning');
+            updateFaceFeedback('warning', 'Wajah Tidak Dikenal', 'Wajah pada foto belum cocok dengan data caberawit yang terdaftar.', 'Tidak Cocok');
+            showToast('Wajah pada foto belum dikenali.', 'warning');
+        }
+    } catch (err) {
+        console.error('Scan from file error:', err);
+        showToast('Gagal menganalisis foto wajah.', 'error');
+    } finally {
+        event.target.value = '';
+    }
+}
+
+async function deleteUserFaceData(userId) {
+    const user = allKaryawanData.find(k => k.id === userId);
+    if (!user) return;
+    if (!confirm(`Hapus data Face ID milik "${user.nama}"?`)) return;
+
+    delete user.faceDescriptor;
+    delete user.faceThumb;
+    delete user.faceUpdatedAt;
+    saveKaryawanToLocalStorage();
+
+    if (isFirebaseConnected) {
+        if (activeEngine === 'rtdb' && rtdb) {
+            rtdb.ref(`karyawan/${userId}/faceDescriptor`).remove().catch(() => {});
+            rtdb.ref(`karyawan/${userId}/faceThumb`).remove().catch(() => {});
+            rtdb.ref(`karyawan/${userId}/faceUpdatedAt`).remove().catch(() => {});
+        } else if (activeEngine === 'firestore' && db && firebase?.firestore?.FieldValue) {
+            db.collection('karyawan').doc(userId).update({
+                faceDescriptor: firebase.firestore.FieldValue.delete(),
+                faceThumb: firebase.firestore.FieldValue.delete(),
+                faceUpdatedAt: firebase.firestore.FieldValue.delete()
+            }).catch(() => {});
+        }
+    }
+
+    refreshFaceIDDataUI();
+    refreshCaberawitDetailIfOpen();
+    showToast(`Data Face ID "${user.nama}" dihapus.`, 'info');
 }
 
 function updateQuickQRCaberawitSelect() {
@@ -5395,10 +6166,20 @@ function renderCurrentCaberawitDetail() {
     }
 
     // Action buttons
+    const btnFace = document.getElementById('detail-btn-face');
+    const btnFaceLabel = document.getElementById('detail-btn-face-label');
     const btnQr = document.getElementById('detail-btn-qr');
     const btnEdit = document.getElementById('detail-btn-edit');
     const btnEditBio = document.getElementById('detail-btn-edit-bio');
     const btnAddRaport = document.getElementById('detail-btn-add-raport');
+    const hasFace = Array.isArray(user.faceDescriptor) && user.faceDescriptor.length === 128;
+    if (btnFace) {
+        btnFace.onclick = () => openFaceEnrollForUser(user.id);
+        btnFace.className = hasFace
+            ? 'inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-100 hover:bg-indigo-200 text-indigo-800 border border-indigo-200 text-xs font-semibold transition-all active:scale-95'
+            : 'inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 text-xs font-semibold transition-all active:scale-95';
+    }
+    if (btnFaceLabel) btnFaceLabel.textContent = hasFace ? 'Face ID ✓' : 'Daftar Face ID';
     if (btnQr) btnQr.onclick = () => openCaberawitQRModal(user.id);
     if (btnEdit) btnEdit.onclick = () => openEditKaryawanModal(user.id);
     if (btnEditBio) btnEditBio.onclick = () => openEditKaryawanModal(user.id);

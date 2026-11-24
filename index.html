@@ -99,6 +99,9 @@
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
+    <!-- Face Recognition (Face ID Client-Side AI) -->
+    <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+
     <!-- Custom Stylesheet -->
     <link rel="stylesheet" href="style.css" />
 </head>
@@ -159,17 +162,8 @@
                         class="nav-icon-wrap w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200">
                         <i class="fa-solid fa-clipboard-check text-[15px]"></i>
                     </div>
-                    <span>Input Absensi</span>
-                </a>
-
-                <a href="javascript:void(0)" id="nav-scan" onclick="navigateTo('scan')"
-                    class="nav-link group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200">
-                    <div
-                        class="nav-icon-wrap w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200">
-                        <i class="fa-solid fa-qrcode text-[15px]"></i>
-                    </div>
-                    <span>Scan QR Absensi</span>
-                    <!-- <span class="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Auto</span> -->
+                    <span>Absensi</span>
+                    <span class="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-primary-100 text-primary-700">3 Mode</span>
                 </a>
 
                 <a href="javascript:void(0)" id="nav-rekap" onclick="navigateTo('rekap')"
@@ -627,9 +621,9 @@
                                     class="inline-flex items-center gap-1.5 px-4 py-2 bg-primary-600 text-white text-xs font-semibold rounded-xl hover:bg-primary-700 active:scale-95 transition-all shadow-md shadow-primary-500/20">
                                     <i class="fa-solid fa-plus text-[10px]"></i> Input Absensi
                                 </button>
-                                <button onclick="navigateTo('scan')"
+                                <button onclick="navigateTo('absensi', 'qr')"
                                     class="inline-flex items-center gap-1.5 px-4 py-2 bg-surface-100 hover:bg-surface-200 text-surface-700 text-xs font-semibold rounded-xl border border-surface-200 transition-all">
-                                    <i class="fa-solid fa-qrcode text-primary-500"></i> Scan QR Absensi
+                                    <i class="fa-solid fa-qrcode text-primary-500"></i> Scan QR / Face ID
                                 </button>
                             </div>
                         </div>
@@ -647,543 +641,800 @@
                 </section>
 
                 <!-- ============================
-                 SECTION: INPUT ABSENSI
+                 SECTION: ABSENSI TERPADU (MANUAL, QR, FACE ID)
                  ============================ -->
-                <section id="section-absensi" class="page-section hidden">
-                    <!-- Livewire Status Notification Banner -->
-                    <!-- <div class="mb-5 p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-indigo-500/10 to-primary-500/10 border border-emerald-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs animate-slide-up">
-                        <div class="flex items-center gap-3">
-                            <span class="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-sm shadow-md shadow-emerald-500/30 shrink-0">
-                                <i class="fa-solid fa-bolt"></i>
-                            </span>
-                            <div>
-                                <span class="font-bold text-surface-900 block text-xs sm:text-sm">Fitur Livewire Reactive Aktif (Tanpa Refresh Halaman)</span>
-                                <span class="text-surface-500 text-[11px]">Ketika Anda menambah, mengedit, atau menghapus absensi, hanya tabel yang diperbarui secara langsung tanpa me-reload atau kembali ke halaman semula.</span>
-                            </div>
-                        </div>
-                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
-                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                            Live Reactive Sync
-                        </span>
-                    </div> -->
+                <section id="section-absensi" class="page-section hidden space-y-5">
 
-                    <!-- 2-Column Responsive Layout: Form on Left + Live Table on Right -->
-                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                        <!-- Left: Form Input Absensi (5 cols on lg) -->
-                        <div
-                            class="lg:col-span-5 bg-white rounded-2xl border border-surface-200/60 shadow-card p-5 sm:p-6 animate-slide-up">
-                            <div class="flex items-center gap-3 mb-5">
-                                <div
-                                    class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-md shadow-primary-500/20">
-                                    <i class="fa-solid fa-clipboard-check text-white text-base"></i>
+                    <!-- Mode Switcher Bar -->
+                    <div class="bg-white rounded-2xl border border-surface-200/60 shadow-card p-3 sm:p-4 animate-slide-up">
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                            <div class="flex items-center gap-2.5 px-1">
+                                <div class="w-8 h-8 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center text-xs shrink-0">
+                                    <i class="fa-solid fa-sliders"></i>
                                 </div>
                                 <div>
-                                    <h3 class="text-base font-bold text-surface-900">Form Input Absensi</h3>
-                                    <p class="text-xs text-surface-400">Pilih atau ketik nama caberawit</p>
+                                    <h3 class="text-xs sm:text-sm font-bold text-surface-900">Pilih Mode Absensi</h3>
+                                    <p class="text-[11px] text-surface-400">Manual, Scan Barcode QR, atau Face ID Wajah</p>
                                 </div>
                             </div>
 
-                            <form id="attendance-form" onsubmit="handleSubmitAbsensi(event)" class="space-y-4">
-                                <!-- Nama Caberawit (Pilih dari Database / Ketik Mandiri) -->
-                                <div>
-                                    <div class="flex items-center justify-between mb-2">
-                                        <label class="block text-xs font-semibold text-surface-700">
-                                            Nama Caberawit <span class="text-rose-500">*</span>
-                                        </label>
-                                        <!-- Mode Switcher Tabs -->
-                                        <div
-                                            class="inline-flex items-center p-0.5 bg-surface-100 rounded-lg border border-surface-200/80 text-[11px] shadow-inner">
-                                            <button type="button" id="btn-mode-db" onclick="setAbsenInputMode('select')"
-                                                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md font-semibold transition-all duration-200 bg-white text-primary-700 shadow-xs">
-                                                <i class="fa-solid fa-database text-[10px] text-primary-600"></i>
-                                                <span>Database</span>
-                                            </button>
-                                            <button type="button" id="btn-mode-manual"
-                                                onclick="setAbsenInputMode('manual')"
-                                                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md font-semibold transition-all duration-200 text-surface-500 hover:text-surface-800">
-                                                <i class="fa-solid fa-keyboard text-[10px]"></i>
-                                                <span>Ketik</span>
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <!-- Mode 1: Sediakan Langsung Dari Database Caberawit -->
-                                    <div id="wrapper-db-caberawit" class="space-y-2">
-                                        <div class="relative">
-                                            <i
-                                                class="fa-solid fa-users absolute left-3.5 top-1/2 -translate-y-1/2 text-primary-500 text-xs pointer-events-none"></i>
-                                            <select id="select-caberawit-absen" onchange="onSelectCaberawitChange(this)"
-                                                class="w-full pl-9 pr-9 py-2.5 text-xs sm:text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 appearance-none cursor-pointer font-medium text-surface-800 hover:border-primary-400">
-                                                <option value="">-- Memuat data Caberawit... --</option>
-                                            </select>
-                                            <i
-                                                class="fa-solid fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-surface-400 text-xs pointer-events-none"></i>
-                                        </div>
-                                        <div class="flex items-center justify-between text-xs px-1">
-                                            <span
-                                                class="inline-flex items-center gap-1.5 text-emerald-600 font-medium text-[11px]">
-                                                <span
-                                                    class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                                <span id="badge-db-caberawit-count">0 Caberawit</span>
-                                            </span>
-                                            <button type="button" onclick="setAbsenInputMode('manual')"
-                                                class="text-[11px] text-primary-600 hover:text-primary-800 hover:underline font-medium inline-flex items-center gap-1">
-                                                <span>Ketik mandiri</span>
-                                                <i class="fa-solid fa-arrow-right text-[9px]"></i>
-                                            </button>
-                                        </div>
-                                        <!-- Info card saat murid dari database dipilih -->
-                                        <div id="caberawit-selected-info"
-                                            class="hidden p-2.5 rounded-xl bg-primary-50/70 border border-primary-200/60 text-xs text-primary-900 animate-fade-in">
-                                            <div class="flex items-center justify-between">
-                                                <div class="flex items-center gap-2">
-                                                    <div
-                                                        class="w-7 h-7 rounded-lg bg-gradient-to-br from-primary-600 to-primary-700 text-white flex items-center justify-center font-bold text-xs shadow-xs">
-                                                        <span id="selected-info-initials">C</span>
-                                                    </div>
-                                                    <div>
-                                                        <span class="font-bold text-surface-900 block text-xs"
-                                                            id="selected-info-name">-</span>
-                                                        <span class="text-[10px] text-primary-700"
-                                                            id="selected-info-role">Caberawit</span>
-                                                    </div>
-                                                </div>
-                                                <span
-                                                    class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200/80 inline-flex items-center gap-1">
-                                                    <i class="fa-solid fa-circle-check text-emerald-600"></i> Terpilih
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Mode 2: Ketik Mandiri -->
-                                    <div id="wrapper-manual-caberawit" class="space-y-2 hidden">
-                                        <div class="relative">
-                                            <i
-                                                class="fa-solid fa-user-pen absolute left-3.5 top-1/2 -translate-y-1/2 text-primary-500 text-xs"></i>
-                                            <input type="text" id="input-nama-manual" list="karyawan-datalist"
-                                                oninput="onManualInputNamaChange(this.value)"
-                                                placeholder="Ketik nama Caberawit..."
-                                                class="w-full pl-9 pr-4 py-2.5 text-xs sm:text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 placeholder:text-surface-400 font-medium text-surface-800" />
-                                        </div>
-                                        <div class="flex items-center justify-between text-xs px-1">
-                                            <span class="text-surface-500 text-[11px]">
-                                                <i class="fa-regular fa-keyboard text-surface-400 mr-1"></i> Ketik nama
-                                                bebas
-                                            </span>
-                                            <button type="button" onclick="setAbsenInputMode('select')"
-                                                class="text-[11px] text-primary-600 hover:text-primary-800 hover:underline font-medium inline-flex items-center gap-1">
-                                                <i class="fa-solid fa-database text-[9px]"></i>
-                                                <span>Pilih database</span>
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <!-- Hidden Input to preserve backward compatibility for #input-nama -->
-                                    <input type="hidden" id="input-nama" name="nama" />
-                                    <datalist id="karyawan-datalist"></datalist>
-                                </div>
-
-                                <!-- Tanggal & Jam -->
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <div>
-                                        <label for="input-tanggal"
-                                            class="block text-xs font-semibold text-surface-700 mb-1">
-                                            Tanggal <span class="text-rose-500">*</span>
-                                        </label>
-                                        <div class="relative">
-                                            <i
-                                                class="fa-regular fa-calendar absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 text-xs"></i>
-                                            <input type="date" id="input-tanggal" name="tanggal" required
-                                                class="w-full pl-8 pr-3 py-2 text-xs sm:text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200" />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label for="input-jam"
-                                            class="block text-xs font-semibold text-surface-700 mb-1">
-                                            Jam Masuk <span class="text-rose-500">*</span>
-                                        </label>
-                                        <div class="relative">
-                                            <i
-                                                class="fa-regular fa-clock absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 text-xs"></i>
-                                            <input type="time" id="input-jam" name="jam" required
-                                                class="w-full pl-8 pr-3 py-2 text-xs sm:text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200" />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Status -->
-                                <div>
-                                    <label for="input-status" class="block text-xs font-semibold text-surface-700 mb-1">
-                                        Status Kehadiran <span class="text-rose-500">*</span>
-                                    </label>
-                                    <div class="relative">
-                                        <i
-                                            class="fa-solid fa-tag absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 text-xs"></i>
-                                        <select id="input-status" name="status" required
-                                            class="w-full pl-8 pr-8 py-2 text-xs sm:text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 appearance-none cursor-pointer"
-                                            style="background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22%2364748b%22%3E%3Cpath%20fill-rule%3D%22evenodd%22%20d%3D%22M5.23%207.21a.75.75%200%20011.06.02L10%2011.168l3.71-3.938a.75.75%200%20111.08%201.04l-4.25%204.5a.75.75%200%2001-1.08%200l-4.25-4.5a.75.75%200%2001.02-1.06z%22%20clip-rule%3D%22evenodd%22%2F%3E%3C%2Fsvg%3E'); background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 1.1em;">
-                                            <option value="" disabled selected>Pilih status...</option>
-                                            <option value="Hadir">✅ Hadir</option>
-                                            <option value="Izin">📋 Izin</option>
-                                            <option value="Sakit">🏥 Sakit</option>
-                                            <option value="Alpa">❌ Alpa</option>
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <!-- Keterangan -->
-                                <div>
-                                    <label for="input-keterangan"
-                                        class="block text-xs font-semibold text-surface-700 mb-1">
-                                        Keterangan <span class="text-surface-400 font-normal">(opsional)</span>
-                                    </label>
-                                    <textarea id="input-keterangan" name="keterangan" rows="2"
-                                        placeholder="Tambahkan catatan jika diperlukan..."
-                                        class="w-full px-3 py-2 text-xs sm:text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 resize-none placeholder:text-surface-400"></textarea>
-                                </div>
-
-                                <!-- Submit Buttons -->
-                                <div class="flex flex-col sm:flex-row gap-2.5 pt-1">
-                                    <button type="submit" id="btn-submit"
-                                        class="flex-1 inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-md shadow-primary-500/25 hover:shadow-lg hover:from-primary-700 hover:to-primary-800 active:scale-[0.98] transition-all duration-200">
-                                        <i class="fa-solid fa-paper-plane text-xs"></i>
-                                        <span>Simpan Absensi</span>
-                                    </button>
-                                    <button type="reset"
-                                        class="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-surface-100 text-surface-600 text-xs sm:text-sm font-semibold rounded-xl hover:bg-surface-200 active:scale-[0.98] transition-all duration-200">
-                                        <i class="fa-solid fa-rotate-left text-xs"></i>
-                                        <span>Reset</span>
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-
-                        <!-- Right: Livewire Reactive Attendance Preview Table (7 cols on lg) -->
-                        <div
-                            class="lg:col-span-7 bg-white rounded-2xl border border-surface-200/60 shadow-card overflow-hidden animate-slide-up livewire-table-container">
-                            <!-- Shimmer Loading Bar (Livewire Loading) -->
-                            <div id="livewire-bar-absensi-preview" class="livewire-loading-bar"></div>
-
-                            <div class="p-4 sm:p-5 border-b border-surface-100">
-                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                                    <div>
-                                        <div class="flex items-center gap-2">
-                                            <h3 class="text-base font-bold text-surface-900">Log Absensi Hari Ini</h3>
-                                            <div class="livewire-pill"
-                                                title="Livewire Reactive: Tabel otomatis ter-refresh saat data baru ditambahkan">
-                                                <span class="livewire-dot"></span>
-                                                <span>Livewire</span>
-                                                <button type="button"
-                                                    onclick="LivewireEngine.refresh('absensi-preview')"
-                                                    class="ml-1 hover:text-primary-800 transition-transform active:rotate-180"
-                                                    title="Refresh Tabel Ini Saja">
-                                                    <i id="livewire-icon-absensi-preview"
-                                                        class="fa-solid fa-arrows-rotate text-[10px]"></i>
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <p class="text-xs text-surface-400 mt-0.5">Tercatat <span
-                                                id="absensi-preview-count" class="font-bold text-primary-600">0</span>
-                                            santri hari ini</p>
-                                    </div>
-                                    <div class="relative">
-                                        <i
-                                            class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 text-xs"></i>
-                                        <input id="search-absensi-preview" type="text"
-                                            placeholder="Cari di log hari ini..."
-                                            oninput="renderInputAbsensiPreviewTable()"
-                                            class="text-xs bg-surface-50 border border-surface-200 rounded-xl pl-8 pr-3 py-1.5 w-full sm:w-44 focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all placeholder:text-surface-400 font-medium" />
-                                    </div>
-                                </div>
-
-                                <!-- Filter Buttons -->
-                                <div
-                                    class="flex flex-wrap items-center gap-1.5 mt-3 pt-3 border-t border-surface-100/80 text-[11px] font-semibold">
-                                    <button type="button" onclick="setAbsensiPreviewFilter('semua')"
-                                        id="btn-prev-filter-semua"
-                                        class="prev-filter-btn px-2.5 py-1 rounded-lg bg-primary-600 text-white border border-primary-600">Semua</button>
-                                    <button type="button" onclick="setAbsensiPreviewFilter('Hadir')"
-                                        id="btn-prev-filter-hadir"
-                                        class="prev-filter-btn px-2.5 py-1 rounded-lg bg-surface-50 text-surface-600 hover:bg-surface-100 border border-surface-200">✅
-                                        Hadir</button>
-                                    <button type="button" onclick="setAbsensiPreviewFilter('Izin')"
-                                        id="btn-prev-filter-izin"
-                                        class="prev-filter-btn px-2.5 py-1 rounded-lg bg-surface-50 text-surface-600 hover:bg-surface-100 border border-surface-200">📋
-                                        Izin</button>
-                                    <button type="button" onclick="setAbsensiPreviewFilter('Sakit')"
-                                        id="btn-prev-filter-sakit"
-                                        class="prev-filter-btn px-2.5 py-1 rounded-lg bg-surface-50 text-surface-600 hover:bg-surface-100 border border-surface-200">🏥
-                                        Sakit</button>
-                                    <button type="button" onclick="setAbsensiPreviewFilter('Alpa')"
-                                        id="btn-prev-filter-alpa"
-                                        class="prev-filter-btn px-2.5 py-1 rounded-lg bg-surface-50 text-surface-600 hover:bg-surface-100 border border-surface-200">❌
-                                        Alpa</button>
-                                </div>
-                            </div>
-
-                            <div class="overflow-x-auto custom-scrollbar max-h-[440px] overflow-y-auto">
-                                <table class="w-full min-w-[500px]">
-                                    <thead class="sticky top-0 bg-surface-50/90 backdrop-blur-sm z-10">
-                                        <tr class="border-b border-surface-100">
-                                            <th
-                                                class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-4 py-2.5">
-                                                No</th>
-                                            <th
-                                                class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-4 py-2.5">
-                                                Nama</th>
-                                            <th
-                                                class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-4 py-2.5">
-                                                Jam</th>
-                                            <th
-                                                class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-4 py-2.5">
-                                                Status</th>
-                                            <th
-                                                class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-4 py-2.5">
-                                                Catatan</th>
-                                            <th
-                                                class="text-center text-[11px] font-bold text-surface-400 uppercase tracking-wider px-4 py-2.5">
-                                                Aksi</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="absensi-preview-table-body" class="divide-y divide-surface-100 text-xs">
-                                        <!-- Injected by LivewireEngine -->
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            <!-- Empty State for Preview -->
-                            <div id="absensi-preview-empty"
-                                class="hidden flex-col items-center justify-center py-12 px-4 text-center">
-                                <div
-                                    class="w-12 h-12 rounded-full bg-surface-100 flex items-center justify-center mb-2.5">
-                                    <i class="fa-solid fa-clipboard-user text-xl text-surface-300"></i>
-                                </div>
-                                <p class="text-xs font-semibold text-surface-700">Belum ada absensi tercatat hari ini
-                                </p>
-                                <p class="text-[11px] text-surface-400 mt-0.5">Isi form di samping untuk mulai mencatat
-                                    kehadiran.</p>
-                            </div>
-
-                            <!-- Footer -->
-                            <div
-                                class="px-5 py-3 border-t border-surface-100 flex items-center justify-between text-xs bg-surface-50/40">
-                                <span class="text-surface-400 text-[11px]"><i
-                                        class="fa-solid fa-bolt text-emerald-500 mr-1"></i>Tersinkronisasi otomatis via
-                                    Livewire Engine.</span>
-                                <button type="button" onclick="navigateTo('dashboard')"
-                                    class="text-primary-600 hover:text-primary-700 font-semibold hover:underline inline-flex items-center gap-1">
-                                    <span>Buka Dashboard</span>
-                                    <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                            <div class="grid grid-cols-3 gap-2 sm:flex sm:items-center bg-surface-100/80 p-1.5 rounded-xl border border-surface-200/70">
+                                <button type="button" id="absen-mode-btn-manual" onclick="switchAbsensiMode('manual')"
+                                    class="absen-mode-btn flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg text-[11px] sm:text-xs font-bold transition-all bg-white text-primary-700 shadow-sm">
+                                    <i class="fa-solid fa-pen-to-square text-xs"></i>
+                                    <span>Manual</span>
+                                </button>
+                                <button type="button" id="absen-mode-btn-qr" onclick="switchAbsensiMode('qr')"
+                                    class="absen-mode-btn flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg text-[11px] sm:text-xs font-semibold transition-all text-surface-600 hover:text-surface-900">
+                                    <i class="fa-solid fa-qrcode text-xs"></i>
+                                    <span>Scan QR</span>
+                                </button>
+                                <button type="button" id="absen-mode-btn-face" onclick="switchAbsensiMode('face')"
+                                    class="absen-mode-btn flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg text-[11px] sm:text-xs font-semibold transition-all text-surface-600 hover:text-surface-900">
+                                    <i class="fa-solid fa-face-viewfinder fa-expand text-xs"></i>
+                                    <span>Face ID</span>
                                 </button>
                             </div>
                         </div>
                     </div>
-                </section>
 
-                <!-- ============================
-                 SECTION: SCAN QR ABSENSI
-                 ============================ -->
-                <section id="section-scan" class="page-section hidden">
-                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-slide-up">
-                        <!-- Left: Scanner Viewport & Controls (7 cols on lg) -->
-                        <div class="lg:col-span-7 xl:col-span-8 space-y-6">
-                            <div class="bg-white rounded-2xl border border-surface-200/60 shadow-card overflow-hidden">
-                                <!-- Card Header -->
-                                <div
-                                    class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-5 sm:p-6 border-b border-surface-100">
+                    <!-- ====================================
+                         PANEL MODE 1: INPUT ABSENSI MANUAL
+                         ==================================== -->
+                    <div id="absensi-panel-manual" class="absensi-mode-panel">
+                        <!-- 2-Column Responsive Layout: Form on Left + Live Table on Right -->
+                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                            <!-- Left: Form Input Absensi (5 cols on lg) -->
+                            <div
+                                class="lg:col-span-5 bg-white rounded-2xl border border-surface-200/60 shadow-card p-5 sm:p-6 animate-slide-up">
+                                <div class="flex items-center gap-3 mb-5">
+                                    <div
+                                        class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-md shadow-primary-500/20">
+                                        <i class="fa-solid fa-clipboard-check text-white text-base"></i>
+                                    </div>
                                     <div>
-                                        <div class="flex items-center gap-2">
-                                            <span
-                                                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 animate-pulse">
-                                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> REALTIME
-                                                QR SCANNER
-                                            </span>
-                                            <span id="scanner-status-badge"
-                                                class="text-xs font-semibold text-surface-500">
-                                                Siap Pindai
-                                            </span>
-                                        </div>
-                                        <h3 class="text-base font-bold text-surface-900 mt-1">Pindai Barcode QR
-                                            Caberawit</h3>
-                                        <p class="text-xs text-surface-400">Dekatkan QR Code ke kamera untuk absensi
-                                            otomatis langsung masuk ke Firebase</p>
-                                    </div>
-
-                                    <!-- Audio toggle & Camera dropdown -->
-                                    <div class="flex items-center gap-2">
-                                        <button type="button" id="btn-toggle-sound" onclick="toggleScanSound()"
-                                            class="p-2.5 rounded-xl border border-surface-200 hover:bg-surface-50 text-surface-600 transition-colors"
-                                            title="Audio Beep Aktif">
-                                            <i id="sound-icon"
-                                                class="fa-solid fa-volume-high text-xs text-emerald-600"></i>
-                                        </button>
-                                        <select id="camera-select" onchange="onCameraSelected(this.value)"
-                                            class="text-xs font-medium bg-surface-50 border border-surface-200 rounded-xl px-3 py-2 text-surface-700 focus:ring-2 focus:ring-primary-500/30 cursor-pointer max-w-[170px] sm:max-w-[210px] truncate">
-                                            <option value="">Pilih Kamera...</option>
-                                        </select>
+                                        <h3 class="text-base font-bold text-surface-900">Form Input Absensi</h3>
+                                        <p class="text-xs text-surface-400">Pilih atau ketik nama caberawit</p>
                                     </div>
                                 </div>
 
-                                <!-- Scanner Viewport Area -->
-                                <div class="p-5 sm:p-6 flex flex-col items-center">
-                                    <div
-                                        class="relative w-full max-w-sm sm:max-w-md aspect-square rounded-2xl overflow-hidden bg-surface-950 shadow-2xl flex items-center justify-center border-2 border-surface-800">
-                                        <!-- Camera Feed Container -->
-                                        <div id="qr-reader"
-                                            class="w-full h-full flex items-center justify-center overflow-hidden">
-                                        </div>
-
-                                        <!-- Reticle & Laser Overlay -->
-                                        <div id="scanner-overlay"
-                                            class="absolute inset-0 pointer-events-none flex flex-col items-center justify-center p-6">
+                                <form id="attendance-form" onsubmit="handleSubmitAbsensi(event)" class="space-y-4">
+                                    <!-- Nama Caberawit (Pilih dari Database / Ketik Mandiri) -->
+                                    <div>
+                                        <div class="flex items-center justify-between mb-2">
+                                            <label class="block text-xs font-semibold text-surface-700">
+                                                Nama Caberawit <span class="text-rose-500">*</span>
+                                            </label>
+                                            <!-- Mode Switcher Tabs -->
                                             <div
-                                                class="relative w-52 h-52 sm:w-64 sm:h-64 border-2 border-dashed border-emerald-400/40 rounded-2xl flex items-center justify-center">
-                                                <div
-                                                    class="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-emerald-400 rounded-tl-lg">
-                                                </div>
-                                                <div
-                                                    class="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-emerald-400 rounded-tr-lg">
-                                                </div>
-                                                <div
-                                                    class="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-emerald-400 rounded-bl-lg">
-                                                </div>
-                                                <div
-                                                    class="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-emerald-400 rounded-br-lg">
-                                                </div>
-                                                <div class="scanner-laser-line"></div>
+                                                class="inline-flex items-center p-0.5 bg-surface-100 rounded-lg border border-surface-200/80 text-[11px] shadow-inner">
+                                                <button type="button" id="btn-mode-db" onclick="setAbsenInputMode('select')"
+                                                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md font-semibold transition-all duration-200 bg-white text-primary-700 shadow-xs">
+                                                    <i class="fa-solid fa-database text-[10px] text-primary-600"></i>
+                                                    <span>Database</span>
+                                                </button>
+                                                <button type="button" id="btn-mode-manual"
+                                                    onclick="setAbsenInputMode('manual')"
+                                                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md font-semibold transition-all duration-200 text-surface-500 hover:text-surface-800">
+                                                    <i class="fa-solid fa-keyboard text-[10px]"></i>
+                                                    <span>Ketik</span>
+                                                </button>
                                             </div>
                                         </div>
 
-                                        <!-- Inactive State Placeholder -->
-                                        <div id="scanner-placeholder"
-                                            class="hidden absolute inset-0 bg-surface-900/95 flex flex-col items-center justify-center text-center p-6 z-10">
-                                            <div
-                                                class="w-16 h-16 rounded-2xl bg-surface-800 flex items-center justify-center mb-3 text-surface-400 text-2xl shadow-inner">
-                                                <i class="fa-solid fa-camera-slash"></i>
+                                        <!-- Mode 1: Sediakan Langsung Dari Database Caberawit -->
+                                        <div id="wrapper-db-caberawit" class="space-y-2">
+                                            <div class="relative">
+                                                <i
+                                                    class="fa-solid fa-users absolute left-3.5 top-1/2 -translate-y-1/2 text-primary-500 text-xs pointer-events-none"></i>
+                                                <select id="select-caberawit-absen" onchange="onSelectCaberawitChange(this)"
+                                                    class="w-full pl-9 pr-9 py-2.5 text-xs sm:text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 appearance-none cursor-pointer font-medium text-surface-800 hover:border-primary-400">
+                                                    <option value="">-- Memuat data Caberawit... --</option>
+                                                </select>
+                                                <i
+                                                    class="fa-solid fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-surface-400 text-xs pointer-events-none"></i>
                                             </div>
-                                            <p class="text-sm font-semibold text-white">Kamera Scanner Tidak Aktif</p>
-                                            <p class="text-xs text-surface-400 mt-1 max-w-xs leading-relaxed">
-                                                Klik tombol di bawah untuk menyalakan kamera atau pilih file foto QR
-                                                Code.
-                                            </p>
-                                            <button type="button" onclick="startQRScanner()"
-                                                class="mt-4 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-semibold rounded-xl transition-all shadow-lg shadow-emerald-600/30">
-                                                <i class="fa-solid fa-play mr-1.5"></i> Nyalakan Kamera
-                                            </button>
+                                            <div class="flex items-center justify-between text-xs px-1">
+                                                <span
+                                                    class="inline-flex items-center gap-1.5 text-emerald-600 font-medium text-[11px]">
+                                                    <span
+                                                        class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                                    <span id="badge-db-caberawit-count">0 Caberawit</span>
+                                                </span>
+                                                <button type="button" onclick="setAbsenInputMode('manual')"
+                                                    class="text-[11px] text-primary-600 hover:text-primary-800 hover:underline font-medium inline-flex items-center gap-1">
+                                                    <span>Ketik mandiri</span>
+                                                    <i class="fa-solid fa-arrow-right text-[9px]"></i>
+                                                </button>
+                                            </div>
+                                            <!-- Info card saat murid dari database dipilih -->
+                                            <div id="caberawit-selected-info"
+                                                class="hidden p-2.5 rounded-xl bg-primary-50/70 border border-primary-200/60 text-xs text-primary-900 animate-fade-in">
+                                                <div class="flex items-center justify-between">
+                                                    <div class="flex items-center gap-2">
+                                                        <div
+                                                            class="w-7 h-7 rounded-lg bg-gradient-to-br from-primary-600 to-primary-700 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                                                            <span id="selected-info-initials">C</span>
+                                                        </div>
+                                                        <div>
+                                                            <span class="font-bold text-surface-900 block text-xs"
+                                                                id="selected-info-name">-</span>
+                                                            <span class="text-[10px] text-primary-700"
+                                                                id="selected-info-role">Caberawit</span>
+                                                        </div>
+                                                    </div>
+                                                    <span
+                                                        class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200/80 inline-flex items-center gap-1">
+                                                        <i class="fa-solid fa-circle-check text-emerald-600"></i> Terpilih
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Mode 2: Ketik Mandiri -->
+                                        <div id="wrapper-manual-caberawit" class="space-y-2 hidden">
+                                            <div class="relative">
+                                                <i
+                                                    class="fa-solid fa-user-pen absolute left-3.5 top-1/2 -translate-y-1/2 text-primary-500 text-xs"></i>
+                                                <input type="text" id="input-nama-manual" list="karyawan-datalist"
+                                                    oninput="onManualInputNamaChange(this.value)"
+                                                    placeholder="Ketik nama Caberawit..."
+                                                    class="w-full pl-9 pr-4 py-2.5 text-xs sm:text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 placeholder:text-surface-400 font-medium text-surface-800" />
+                                            </div>
+                                            <div class="flex items-center justify-between text-xs px-1">
+                                                <span class="text-surface-500 text-[11px]">
+                                                    <i class="fa-regular fa-keyboard text-surface-400 mr-1"></i> Ketik nama
+                                                    bebas
+                                                </span>
+                                                <button type="button" onclick="setAbsenInputMode('select')"
+                                                    class="text-[11px] text-primary-600 hover:text-primary-800 hover:underline font-medium inline-flex items-center gap-1">
+                                                    <i class="fa-solid fa-database text-[9px]"></i>
+                                                    <span>Pilih database</span>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <!-- Hidden Input to preserve backward compatibility for #input-nama -->
+                                        <input type="hidden" id="input-nama" name="nama" />
+                                        <datalist id="karyawan-datalist"></datalist>
+                                    </div>
+
+                                    <!-- Tanggal & Jam -->
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div>
+                                            <label for="input-tanggal"
+                                                class="block text-xs font-semibold text-surface-700 mb-1">
+                                                Tanggal <span class="text-rose-500">*</span>
+                                            </label>
+                                            <div class="relative">
+                                                <i
+                                                    class="fa-regular fa-calendar absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 text-xs"></i>
+                                                <input type="date" id="input-tanggal" name="tanggal" required
+                                                    class="w-full pl-8 pr-3 py-2 text-xs sm:text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200" />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label for="input-jam"
+                                                class="block text-xs font-semibold text-surface-700 mb-1">
+                                                Jam Masuk <span class="text-rose-500">*</span>
+                                            </label>
+                                            <div class="relative">
+                                                <i
+                                                    class="fa-regular fa-clock absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 text-xs"></i>
+                                                <input type="time" id="input-jam" name="jam" required
+                                                    class="w-full pl-8 pr-3 py-2 text-xs sm:text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200" />
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <!-- Controls -->
-                                    <div
-                                        class="flex flex-wrap items-center justify-center gap-2.5 mt-5 w-full max-w-md">
-                                        <button type="button" id="btn-toggle-camera" onclick="toggleQRScanner()"
-                                            class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-lg shadow-rose-500/25 transition-all">
-                                            <i id="btn-toggle-camera-icon" class="fa-solid fa-stop text-xs"></i>
-                                            <span id="btn-toggle-camera-text">Hentikan Kamera</span>
-                                        </button>
-
-                                        <button type="button" id="btn-switch-camera" onclick="switchCameraFacing()"
-                                            class="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 bg-surface-100 hover:bg-surface-200 text-surface-700 text-xs sm:text-sm font-medium rounded-xl transition-all active:scale-[0.98]">
-                                            <i class="fa-solid fa-camera-rotate"></i>
-                                            <span class="hidden sm:inline">Ganti Kamera</span>
-                                        </button>
-
-                                        <label for="qr-file-input"
-                                            class="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 bg-surface-100 hover:bg-surface-200 text-surface-700 text-xs sm:text-sm font-medium rounded-xl transition-all cursor-pointer active:scale-[0.98]"
-                                            title="Pindai dari file gambar QR">
-                                            <i class="fa-solid fa-image"></i>
-                                            <span class="hidden sm:inline">Unggah Foto</span>
-                                            <input type="file" id="qr-file-input" accept="image/*" class="hidden"
-                                                onchange="handleQRFileUpload(this)" />
+                                    <!-- Status -->
+                                    <div>
+                                        <label for="input-status" class="block text-xs font-semibold text-surface-700 mb-1">
+                                            Status Kehadiran <span class="text-rose-500">*</span>
                                         </label>
+                                        <div class="relative">
+                                            <i
+                                                class="fa-solid fa-tag absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 text-xs"></i>
+                                            <select id="input-status" name="status" required
+                                                class="w-full pl-8 pr-8 py-2 text-xs sm:text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 appearance-none cursor-pointer"
+                                                style="background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22%2364748b%22%3E%3Cpath%20fill-rule%3D%22evenodd%22%20d%3D%22M5.23%207.21a.75.75%200%20011.06.02L10%2011.168l3.71-3.938a.75.75%200%20111.08%201.04l-4.25%204.5a.75.75%200%2001-1.08%200l-4.25-4.5a.75.75%200%2001.02-1.06z%22%20clip-rule%3D%22evenodd%22%2F%3E%3C%2Fsvg%3E'); background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 1.1em;">
+                                                <option value="" disabled selected>Pilih status...</option>
+                                                <option value="Hadir">✅ Hadir</option>
+                                                <option value="Izin">📋 Izin</option>
+                                                <option value="Sakit">🏥 Sakit</option>
+                                                <option value="Alpa">❌ Alpa</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <!-- Keterangan -->
+                                    <div>
+                                        <label for="input-keterangan"
+                                            class="block text-xs font-semibold text-surface-700 mb-1">
+                                            Keterangan <span class="text-surface-400 font-normal">(opsional)</span>
+                                        </label>
+                                        <textarea id="input-keterangan" name="keterangan" rows="2"
+                                            placeholder="Tambahkan catatan jika diperlukan..."
+                                            class="w-full px-3 py-2 text-xs sm:text-sm bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 resize-none placeholder:text-surface-400"></textarea>
+                                    </div>
+
+                                    <!-- Submit Buttons -->
+                                    <div class="flex flex-col sm:flex-row gap-2.5 pt-1">
+                                        <button type="submit" id="btn-submit"
+                                            class="flex-1 inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-md shadow-primary-500/25 hover:shadow-lg hover:from-primary-700 hover:to-primary-800 active:scale-[0.98] transition-all duration-200">
+                                            <i class="fa-solid fa-paper-plane text-xs"></i>
+                                            <span>Simpan Absensi</span>
+                                        </button>
+                                        <button type="reset"
+                                            class="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-surface-100 text-surface-600 text-xs sm:text-sm font-semibold rounded-xl hover:bg-surface-200 active:scale-[0.98] transition-all duration-200">
+                                            <i class="fa-solid fa-rotate-left text-xs"></i>
+                                            <span>Reset</span>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <!-- Right: Livewire Reactive Attendance Preview Table (7 cols on lg) -->
+                            <div
+                                class="lg:col-span-7 bg-white rounded-2xl border border-surface-200/60 shadow-card overflow-hidden animate-slide-up livewire-table-container">
+                                <!-- Shimmer Loading Bar (Livewire Loading) -->
+                                <div id="livewire-bar-absensi-preview" class="livewire-loading-bar"></div>
+
+                                <div class="p-4 sm:p-5 border-b border-surface-100">
+                                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                        <div>
+                                            <div class="flex items-center gap-2">
+                                                <h3 class="text-base font-bold text-surface-900">Log Absensi Hari Ini</h3>
+                                                <div class="livewire-pill"
+                                                    title="Livewire Reactive: Tabel otomatis ter-refresh saat data baru ditambahkan">
+                                                    <span class="livewire-dot"></span>
+                                                    <span>Livewire</span>
+                                                    <button type="button"
+                                                        onclick="LivewireEngine.refresh('absensi-preview')"
+                                                        class="ml-1 hover:text-primary-800 transition-transform active:rotate-180"
+                                                        title="Refresh Tabel Ini Saja">
+                                                        <i id="livewire-icon-absensi-preview"
+                                                            class="fa-solid fa-arrows-rotate text-[10px]"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <p class="text-xs text-surface-400 mt-0.5">Tercatat <span
+                                                    id="absensi-preview-count" class="font-bold text-primary-600">0</span>
+                                                santri hari ini</p>
+                                        </div>
+                                        <div class="relative">
+                                            <i
+                                                class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 text-xs"></i>
+                                            <input id="search-absensi-preview" type="text"
+                                                placeholder="Cari di log hari ini..."
+                                                oninput="renderInputAbsensiPreviewTable()"
+                                                class="text-xs bg-surface-50 border border-surface-200 rounded-xl pl-8 pr-3 py-1.5 w-full sm:w-44 focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all placeholder:text-surface-400 font-medium" />
+                                        </div>
+                                    </div>
+
+                                    <!-- Filter Buttons -->
+                                    <div
+                                        class="flex flex-wrap items-center gap-1.5 mt-3 pt-3 border-t border-surface-100/80 text-[11px] font-semibold">
+                                        <button type="button" onclick="setAbsensiPreviewFilter('semua')"
+                                            id="btn-prev-filter-semua"
+                                            class="prev-filter-btn px-2.5 py-1 rounded-lg bg-primary-600 text-white border border-primary-600">Semua</button>
+                                        <button type="button" onclick="setAbsensiPreviewFilter('Hadir')"
+                                            id="btn-prev-filter-hadir"
+                                            class="prev-filter-btn px-2.5 py-1 rounded-lg bg-surface-50 text-surface-600 hover:bg-surface-100 border border-surface-200">✅
+                                            Hadir</button>
+                                        <button type="button" onclick="setAbsensiPreviewFilter('Izin')"
+                                            id="btn-prev-filter-izin"
+                                            class="prev-filter-btn px-2.5 py-1 rounded-lg bg-surface-50 text-surface-600 hover:bg-surface-100 border border-surface-200">📋
+                                            Izin</button>
+                                        <button type="button" onclick="setAbsensiPreviewFilter('Sakit')"
+                                            id="btn-prev-filter-sakit"
+                                            class="prev-filter-btn px-2.5 py-1 rounded-lg bg-surface-50 text-surface-600 hover:bg-surface-100 border border-surface-200">🏥
+                                            Sakit</button>
+                                        <button type="button" onclick="setAbsensiPreviewFilter('Alpa')"
+                                            id="btn-prev-filter-alpa"
+                                            class="prev-filter-btn px-2.5 py-1 rounded-lg bg-surface-50 text-surface-600 hover:bg-surface-100 border border-surface-200">❌
+                                            Alpa</button>
                                     </div>
                                 </div>
 
-                                <!-- Feedback Status Box -->
-                                <div id="scan-feedback-box"
-                                    class="p-4 mx-6 mb-6 rounded-2xl bg-surface-50 border border-surface-200 transition-all duration-300">
-                                    <div class="flex items-center gap-3">
-                                        <div id="scan-feedback-icon"
-                                            class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-lg shrink-0">
-                                            <i class="fa-solid fa-qrcode"></i>
+                                <div class="hidden md:block overflow-x-auto custom-scrollbar max-h-[440px] overflow-y-auto">
+                                    <table class="w-full min-w-[500px]">
+                                        <thead class="sticky top-0 bg-surface-50/90 backdrop-blur-sm z-10">
+                                            <tr class="border-b border-surface-100">
+                                                <th
+                                                    class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-4 py-2.5">
+                                                    No</th>
+                                                <th
+                                                    class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-4 py-2.5">
+                                                    Nama</th>
+                                                <th
+                                                    class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-4 py-2.5">
+                                                    Jam</th>
+                                                <th
+                                                    class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-4 py-2.5">
+                                                    Status</th>
+                                                <th
+                                                    class="text-left text-[11px] font-bold text-surface-400 uppercase tracking-wider px-4 py-2.5">
+                                                    Catatan</th>
+                                                <th
+                                                    class="text-center text-[11px] font-bold text-surface-400 uppercase tracking-wider px-4 py-2.5">
+                                                    Aksi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="absensi-preview-table-body" class="divide-y divide-surface-100 text-xs">
+                                            <!-- Injected by LivewireEngine -->
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <!-- Mobile Compact List -->
+                                <div id="absensi-preview-card-list" class="md:hidden divide-y divide-surface-100 max-h-[380px] overflow-y-auto"></div>
+
+                                <!-- Empty State for Preview -->
+                                <div id="absensi-preview-empty"
+                                    class="hidden flex-col items-center justify-center py-12 px-4 text-center">
+                                    <div
+                                        class="w-12 h-12 rounded-full bg-surface-100 flex items-center justify-center mb-2.5">
+                                        <i class="fa-solid fa-clipboard-user text-xl text-surface-300"></i>
+                                    </div>
+                                    <p class="text-xs font-semibold text-surface-700">Belum ada absensi tercatat hari ini
+                                    </p>
+                                    <p class="text-[11px] text-surface-400 mt-0.5">Isi form di samping untuk mulai mencatat
+                                        kehadiran.</p>
+                                </div>
+
+                                <!-- Footer -->
+                                <div
+                                    class="px-5 py-3 border-t border-surface-100 flex items-center justify-between text-xs bg-surface-50/40">
+                                    <span class="text-surface-400 text-[11px]"><i
+                                            class="fa-solid fa-bolt text-emerald-500 mr-1"></i>Tersinkronisasi otomatis via
+                                        Livewire Engine.</span>
+                                    <button type="button" onclick="navigateTo('dashboard')"
+                                        class="text-primary-600 hover:text-primary-700 font-semibold hover:underline inline-flex items-center gap-1">
+                                        <span>Buka Dashboard</span>
+                                        <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ====================================
+                         PANEL MODE 2: SCAN QR ABSENSI
+                         ==================================== -->
+                    <div id="absensi-panel-qr" class="absensi-mode-panel hidden">
+                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-slide-up">
+                            <!-- Left: Scanner Viewport & Controls (7 cols on lg) -->
+                            <div class="lg:col-span-7 xl:col-span-8 space-y-6">
+                                <div class="bg-white rounded-2xl border border-surface-200/60 shadow-card overflow-hidden">
+                                    <!-- Card Header -->
+                                    <div
+                                        class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-5 sm:p-6 border-b border-surface-100">
+                                        <div>
+                                            <div class="flex items-center gap-2">
+                                                <span
+                                                    class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 animate-pulse">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> REALTIME
+                                                    QR SCANNER
+                                                </span>
+                                                <span id="scanner-status-badge"
+                                                    class="text-xs font-semibold text-surface-500">
+                                                    Siap Pindai
+                                                </span>
+                                            </div>
+                                            <h3 class="text-base font-bold text-surface-900 mt-1">Pindai Barcode QR
+                                                Caberawit</h3>
+                                            <p class="text-xs text-surface-400">Dekatkan QR Code ke kamera untuk absensi
+                                                otomatis langsung masuk ke Firebase</p>
                                         </div>
-                                        <div class="flex-1 min-w-0">
-                                            <p id="scan-feedback-title"
-                                                class="text-sm font-bold text-surface-900 truncate">Siap Memindai QR
-                                                Code</p>
-                                            <p id="scan-feedback-desc" class="text-xs text-surface-500">Posisikan
-                                                barcode QR di dalam bingkai kamera.</p>
+
+                                        <!-- Audio toggle & Camera dropdown -->
+                                        <div class="flex items-center gap-2">
+                                            <button type="button" id="btn-toggle-sound" onclick="toggleScanSound()"
+                                                class="p-2.5 rounded-xl border border-surface-200 hover:bg-surface-50 text-surface-600 transition-colors"
+                                                title="Audio Beep Aktif">
+                                                <i id="sound-icon"
+                                                    class="fa-solid fa-volume-high text-xs text-emerald-600"></i>
+                                            </button>
+                                            <select id="select-camera-device" onchange="onCameraDeviceSelected(this.value)"
+                                                class="text-xs font-medium bg-surface-50 border border-surface-200 rounded-xl px-3 py-2 text-surface-700 focus:ring-2 focus:ring-primary-500/30 cursor-pointer max-w-[170px] sm:max-w-[210px] truncate">
+                                                <option value="">Pilih Kamera...</option>
+                                            </select>
                                         </div>
-                                        <span id="scan-feedback-badge"
-                                            class="hidden px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-700">
-                                            ✅ HADIR
-                                        </span>
+                                    </div>
+
+                                    <!-- Scanner Viewport Area -->
+                                    <div class="p-5 sm:p-6 flex flex-col items-center">
+                                        <div
+                                            class="relative w-full max-w-sm sm:max-w-md aspect-square rounded-2xl overflow-hidden bg-surface-950 shadow-2xl flex items-center justify-center border-2 border-surface-800">
+                                            <!-- Camera Feed Container -->
+                                            <div id="qr-reader"
+                                                class="w-full h-full flex items-center justify-center overflow-hidden">
+                                            </div>
+
+                                            <!-- Reticle & Laser Overlay -->
+                                            <div id="scanner-overlay"
+                                                class="absolute inset-0 pointer-events-none flex flex-col items-center justify-center p-6">
+                                                <div
+                                                    class="relative w-52 h-52 sm:w-64 sm:h-64 border-2 border-dashed border-emerald-400/40 rounded-2xl flex items-center justify-center">
+                                                    <div
+                                                        class="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-emerald-400 rounded-tl-lg">
+                                                    </div>
+                                                    <div
+                                                        class="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-emerald-400 rounded-tr-lg">
+                                                    </div>
+                                                    <div
+                                                        class="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-emerald-400 rounded-bl-lg">
+                                                    </div>
+                                                    <div
+                                                        class="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-emerald-400 rounded-br-lg">
+                                                    </div>
+                                                    <div class="scanner-laser-line"></div>
+                                                </div>
+                                            </div>
+
+                                            <!-- Inactive State Placeholder -->
+                                            <div id="scanner-placeholder"
+                                                class="hidden absolute inset-0 bg-surface-900/95 flex flex-col items-center justify-center text-center p-6 z-10">
+                                                <div
+                                                    class="w-16 h-16 rounded-2xl bg-surface-800 flex items-center justify-center mb-3 text-surface-400 text-2xl shadow-inner">
+                                                    <i class="fa-solid fa-camera-slash"></i>
+                                                </div>
+                                                <p class="text-sm font-semibold text-white">Kamera Scanner Tidak Aktif</p>
+                                                <p class="text-xs text-surface-400 mt-1 max-w-xs leading-relaxed">
+                                                    Klik tombol di bawah untuk menyalakan kamera atau pilih file foto QR
+                                                    Code.
+                                                </p>
+                                                <button type="button" onclick="startQRScanner()"
+                                                    class="mt-4 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-semibold rounded-xl transition-all shadow-lg shadow-emerald-600/30">
+                                                    <i class="fa-solid fa-play mr-1.5"></i> Nyalakan Kamera
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <!-- Controls -->
+                                        <div
+                                            class="flex flex-wrap items-center justify-center gap-2.5 mt-5 w-full max-w-md">
+                                            <button type="button" id="btn-toggle-camera" onclick="toggleQRScanner()"
+                                                class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-lg shadow-rose-500/25 transition-all">
+                                                <i id="btn-toggle-camera-icon" class="fa-solid fa-stop text-xs"></i>
+                                                <span id="btn-toggle-camera-text">Hentikan Kamera</span>
+                                            </button>
+
+                                            <button type="button" id="btn-switch-camera" onclick="switchCameraFacing()"
+                                                class="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 bg-surface-100 hover:bg-surface-200 text-surface-700 text-xs sm:text-sm font-medium rounded-xl transition-all active:scale-[0.98]">
+                                                <i class="fa-solid fa-camera-rotate"></i>
+                                                <span class="hidden sm:inline">Ganti Kamera</span>
+                                            </button>
+
+                                            <label for="qr-file-input"
+                                                class="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 bg-surface-100 hover:bg-surface-200 text-surface-700 text-xs sm:text-sm font-medium rounded-xl transition-all cursor-pointer active:scale-[0.98]"
+                                                title="Pindai dari file gambar QR">
+                                                <i class="fa-solid fa-image"></i>
+                                                <span class="hidden sm:inline">Unggah Foto</span>
+                                                <input type="file" id="qr-file-input" accept="image/*" class="hidden"
+                                                    onchange="handleQRImageUpload(event)" />
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Feedback Status Box -->
+                                    <div id="scan-feedback-box"
+                                        class="p-4 mx-4 sm:mx-6 mb-6 rounded-2xl bg-surface-50 border border-surface-200 transition-all duration-300">
+                                        <div class="flex items-center gap-3">
+                                            <div id="scan-feedback-icon"
+                                                class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-lg shrink-0">
+                                                <i class="fa-solid fa-qrcode"></i>
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <p id="scan-feedback-title"
+                                                    class="text-sm font-bold text-surface-900 truncate">Siap Memindai QR
+                                                    Code</p>
+                                                <p id="scan-feedback-desc" class="text-xs text-surface-500">Posisikan
+                                                    barcode QR di dalam bingkai kamera.</p>
+                                            </div>
+                                            <span id="scan-feedback-badge"
+                                                class="hidden px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-700 shrink-0">
+                                                ✅ HADIR
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Right: Live Feed & QR Tools (5 cols on lg) -->
+                            <div class="lg:col-span-5 xl:col-span-4 space-y-6">
+                                <!-- Live Feed Hari Ini -->
+                                <div class="bg-white rounded-2xl border border-surface-200/60 shadow-card p-5 sm:p-6">
+                                    <div class="flex items-center justify-between mb-4">
+                                        <div class="flex items-center gap-2.5">
+                                            <div
+                                                class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs">
+                                                <i class="fa-solid fa-clock-rotate-left"></i>
+                                            </div>
+                                            <div>
+                                                <h4 class="text-sm font-bold text-surface-900">Hasil Absensi Hari Ini</h4>
+                                                <p class="text-[11px] text-surface-400">Total: <span id="qr-scanned-count"
+                                                        class="font-bold text-emerald-600">0</span> orang</p>
+                                            </div>
+                                        </div>
+                                        <span class="text-[10px] font-semibold text-surface-400 font-mono"
+                                            id="scan-live-clock">--:--</span>
+                                    </div>
+
+                                    <div id="today-scans-feed"
+                                        class="space-y-2.5 max-h-[380px] overflow-y-auto custom-scrollbar pr-1">
+                                        <div class="py-8 text-center text-surface-400 text-xs">
+                                            <i class="fa-solid fa-inbox text-2xl mb-2 text-surface-300 block"></i>
+                                            Belum ada yang scan hari ini.
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Cetak / Lihat QR Code Caberawit -->
+                                <div
+                                    class="bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/50 rounded-2xl border border-indigo-100/80 shadow-card p-5 sm:p-6">
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <div
+                                            class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs shadow-sm shadow-indigo-500/30">
+                                            <i class="fa-solid fa-id-card"></i>
+                                        </div>
+                                        <div>
+                                            <h4 class="text-sm font-bold text-surface-900">QR Code Caberawit</h4>
+                                            <p class="text-[11px] text-surface-500">Lihat atau cetak kartu barcode peserta</p>
+                                        </div>
+                                    </div>
+
+                                    <p class="text-xs text-surface-600 leading-relaxed mb-4">
+                                        Setiap Caberawit memiliki barcode QR unik. Pilih nama di bawah untuk melihat dan
+                                        mencetak kartu QR.
+                                    </p>
+
+                                    <div class="space-y-3">
+                                        <select id="quick-qr-caberawit-select"
+                                            onchange="if(this.value) openCaberawitQRModal(this.value)"
+                                            class="w-full text-xs font-semibold bg-white border border-surface-200 rounded-xl px-3 py-2.5 text-surface-700 focus:ring-2 focus:ring-primary-500/30 cursor-pointer">
+                                            <option value="">-- Pilih Caberawit untuk Lihat QR --</option>
+                                        </select>
+
+                                        <button type="button" onclick="navigateTo('karyawan')"
+                                            class="w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 bg-white hover:bg-surface-50 text-indigo-700 text-xs font-semibold rounded-xl border border-indigo-200 transition-all shadow-xs">
+                                            <i class="fa-solid fa-users text-xs"></i> Kelola Data Caberawit
+                                        </button>
                                     </div>
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        <!-- Right: Live Feed & QR Tools (5 cols on lg) -->
-                        <div class="lg:col-span-5 xl:col-span-4 space-y-6">
-                            <!-- Live Feed Hari Ini -->
-                            <div class="bg-white rounded-2xl border border-surface-200/60 shadow-card p-5 sm:p-6">
-                                <div class="flex items-center justify-between mb-4">
-                                    <div class="flex items-center gap-2.5">
-                                        <div
-                                            class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs">
-                                            <i class="fa-solid fa-clock-rotate-left"></i>
-                                        </div>
+                    <!-- ====================================
+                         PANEL MODE 3: FACE ID ABSENSI (WAJAH)
+                         ==================================== -->
+                    <div id="absensi-panel-face" class="absensi-mode-panel hidden">
+                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-slide-up">
+                            <!-- Left: Face Camera & Controls -->
+                            <div class="lg:col-span-7 xl:col-span-8 space-y-6">
+                                <div class="bg-white rounded-2xl border border-surface-200/60 shadow-card overflow-hidden">
+                                    <!-- Card Header -->
+                                    <div
+                                        class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-5 sm:p-6 border-b border-surface-100">
                                         <div>
-                                            <h4 class="text-sm font-bold text-surface-900">Hasil Scan Hari Ini</h4>
-                                            <p class="text-[11px] text-surface-400">Total: <span id="qr-scanned-count"
-                                                    class="font-bold text-emerald-600">0</span> orang</p>
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                <span
+                                                    class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
+                                                    REALTIME FACE ID
+                                                </span>
+                                                <span id="face-status-badge"
+                                                    class="text-xs font-semibold text-surface-500">
+                                                    Siap Memindai Wajah
+                                                </span>
+                                            </div>
+                                            <h3 class="text-base font-bold text-surface-900 mt-1">Absensi Pengenalan Wajah (Face ID)</h3>
+                                            <p class="text-xs text-surface-400">Arahkan wajah ke kamera untuk absensi otomatis atau daftarkan wajah santri baru</p>
+                                        </div>
+
+                                        <!-- Audio & Sub-Mode Toggle -->
+                                        <div class="flex items-center gap-2">
+                                            <button type="button" onclick="toggleScanSound()"
+                                                class="p-2.5 rounded-xl border border-surface-200 hover:bg-surface-50 text-surface-600 transition-colors"
+                                                title="Toggle Audio Beep">
+                                                <i id="face-sound-icon"
+                                                    class="fa-solid fa-volume-high text-xs text-emerald-600"></i>
+                                            </button>
+                                            <div class="inline-flex items-center p-1 bg-surface-100 rounded-xl border border-surface-200/80 text-[11px]">
+                                                <button type="button" id="face-submode-scan" onclick="setFaceSubMode('scan')"
+                                                    class="px-2.5 py-1.5 rounded-lg font-bold bg-white text-indigo-700 shadow-xs transition-all">
+                                                    Scan Absen
+                                                </button>
+                                                <button type="button" id="face-submode-enroll" onclick="setFaceSubMode('enroll')"
+                                                    class="px-2.5 py-1.5 rounded-lg font-semibold text-surface-600 hover:text-surface-900 transition-all">
+                                                    Daftar Wajah
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
-                                    <span class="text-[10px] font-semibold text-surface-400 font-mono"
-                                        id="qr-live-clock">--:--</span>
-                                </div>
 
-                                <div id="qr-recent-list"
-                                    class="space-y-2.5 max-h-[380px] overflow-y-auto custom-scrollbar pr-1">
-                                    <div class="py-8 text-center text-surface-400 text-xs">
-                                        <i class="fa-solid fa-inbox text-2xl mb-2 text-surface-300 block"></i>
-                                        Belum ada yang scan hari ini.
+                                    <!-- Enroll Bar (Only shown in Daftar Wajah sub-mode) -->
+                                    <div id="face-enroll-bar" class="hidden px-5 sm:px-6 py-4 bg-indigo-50/70 border-b border-indigo-100 space-y-3">
+                                        <div class="flex flex-col sm:flex-row sm:items-end gap-2.5">
+                                            <div class="flex-1">
+                                                <label class="block text-[11px] font-bold uppercase tracking-wider text-indigo-900 mb-1">
+                                                    Pilih Caberawit yang Akan Didaftarkan Wajahnya
+                                                </label>
+                                                <select id="face-enroll-select"
+                                                    class="w-full px-3 py-2 text-xs sm:text-sm bg-white border border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500/30 font-medium text-surface-800">
+                                                    <option value="">-- Pilih Caberawit --</option>
+                                                </select>
+                                            </div>
+                                            <button type="button" id="btn-capture-enroll-face" onclick="captureAndEnrollFace()"
+                                                class="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-500/25 active:scale-95 transition-all whitespace-nowrap">
+                                                <i class="fa-solid fa-camera"></i>
+                                                <span>Rekam & Simpan Wajah</span>
+                                            </button>
+                                            <label for="face-enroll-file"
+                                                class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-white hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold rounded-xl cursor-pointer transition-all whitespace-nowrap">
+                                                <i class="fa-solid fa-image"></i>
+                                                <span>Dari Foto</span>
+                                                <input type="file" id="face-enroll-file" accept="image/*" class="hidden"
+                                                    onchange="handleFaceEnrollFromFile(event)" />
+                                            </label>
+                                        </div>
+                                        <p class="text-[11px] text-indigo-700/80">
+                                            <i class="fa-solid fa-circle-info mr-1"></i>
+                                            Pastikan wajah menghadap lurus ke kamera dengan pencahayaan cukup dan tidak tertutup masker/kacamata gelap.
+                                        </p>
+                                    </div>
+
+                                    <!-- Face Camera Viewport -->
+                                    <div class="p-5 sm:p-6 flex flex-col items-center">
+                                        <div
+                                            class="relative w-full max-w-sm sm:max-w-md aspect-[4/3] sm:aspect-square rounded-2xl overflow-hidden bg-surface-950 shadow-2xl flex items-center justify-center border-2 border-surface-800">
+                                            <video id="face-video" autoplay muted playsinline
+                                                class="w-full h-full object-cover"></video>
+                                            <canvas id="face-overlay-canvas"
+                                                class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
+
+                                            <!-- Face Guide Oval Overlay -->
+                                            <div id="face-guide-overlay"
+                                                class="absolute inset-0 pointer-events-none flex items-center justify-center">
+                                                <div class="w-44 h-56 sm:w-52 sm:h-64 rounded-[50%] border-2 border-dashed border-indigo-400/50 shadow-[0_0_25px_rgba(99,102,241,0.2)]"></div>
+                                            </div>
+
+                                            <!-- Model Loading Overlay -->
+                                            <div id="face-model-loading"
+                                                class="hidden absolute inset-0 bg-surface-950/85 backdrop-blur-xs flex flex-col items-center justify-center text-center p-6 z-20">
+                                                <div class="w-12 h-12 rounded-2xl bg-indigo-600/20 border border-indigo-400/40 flex items-center justify-center mb-3">
+                                                    <i class="fa-solid fa-spinner fa-spin text-indigo-400 text-xl"></i>
+                                                </div>
+                                                <p class="text-xs sm:text-sm font-bold text-white">Memuat Model AI Face ID...</p>
+                                                <p class="text-[11px] text-surface-400 mt-1 max-w-xs">Pengunduhan pertama membutuhkan koneksi internet dan akan di-cache otomatis.</p>
+                                            </div>
+
+                                            <!-- Inactive Placeholder -->
+                                            <div id="face-placeholder"
+                                                class="absolute inset-0 bg-surface-900/95 flex flex-col items-center justify-center text-center p-6 z-10">
+                                                <div
+                                                    class="w-16 h-16 rounded-2xl bg-surface-800 flex items-center justify-center mb-3 text-indigo-400 text-2xl shadow-inner">
+                                                    <i class="fa-solid fa-face-smile"></i>
+                                                </div>
+                                                <p class="text-sm font-semibold text-white">Kamera Face ID Belum Aktif</p>
+                                                <p class="text-xs text-surface-400 mt-1 max-w-xs leading-relaxed">
+                                                    Klik tombol di bawah untuk mengaktifkan kamera pengenalan wajah.
+                                                </p>
+                                                <button type="button" onclick="startFaceIDCamera()"
+                                                    class="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-semibold rounded-xl transition-all shadow-lg shadow-indigo-600/30">
+                                                    <i class="fa-solid fa-play mr-1.5"></i> Aktifkan Face ID
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <!-- Controls -->
+                                        <div
+                                            class="flex flex-wrap items-center justify-center gap-2.5 mt-5 w-full max-w-md">
+                                            <button type="button" id="btn-toggle-face-camera" onclick="toggleFaceIDCamera()"
+                                                class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-lg shadow-indigo-500/25 transition-all">
+                                                <i class="fa-solid fa-play text-xs"></i>
+                                                <span>Aktifkan Kamera</span>
+                                            </button>
+
+                                            <button type="button" onclick="switchFaceCameraFacing()"
+                                                class="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 bg-surface-100 hover:bg-surface-200 text-surface-700 text-xs sm:text-sm font-medium rounded-xl transition-all active:scale-[0.98]">
+                                                <i class="fa-solid fa-camera-rotate"></i>
+                                                <span class="hidden sm:inline">Ganti Kamera</span>
+                                            </button>
+
+                                            <label for="face-scan-file"
+                                                class="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 bg-surface-100 hover:bg-surface-200 text-surface-700 text-xs sm:text-sm font-medium rounded-xl transition-all cursor-pointer active:scale-[0.98]"
+                                                title="Cocokkan wajah dari foto">
+                                                <i class="fa-solid fa-image"></i>
+                                                <span class="hidden sm:inline">Absen Foto</span>
+                                                <input type="file" id="face-scan-file" accept="image/*" class="hidden"
+                                                    onchange="handleFaceScanFromFile(event)" />
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Face Feedback Status Box -->
+                                    <div id="face-feedback-box"
+                                        class="p-4 mx-4 sm:mx-6 mb-6 rounded-2xl bg-surface-50 border border-surface-200 transition-all duration-300">
+                                        <div class="flex items-center gap-3">
+                                            <div id="face-feedback-icon"
+                                                class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center text-lg shrink-0">
+                                                <i class="fa-solid fa-face-smile"></i>
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <p id="face-feedback-title"
+                                                    class="text-sm font-bold text-surface-900 truncate">Siap Memindai Wajah</p>
+                                                <p id="face-feedback-desc" class="text-xs text-surface-500">Daftarkan wajah caberawit terlebih dahulu melalui tab "Daftar Wajah".</p>
+                                            </div>
+                                            <span id="face-feedback-badge"
+                                                class="hidden px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-700 shrink-0">
+                                                ✅ HADIR
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Cetak / Lihat QR Code Caberawit -->
-                            <div
-                                class="bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/50 rounded-2xl border border-indigo-100/80 shadow-card p-5 sm:p-6">
-                                <div class="flex items-center gap-3 mb-3">
-                                    <div
-                                        class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs shadow-sm shadow-indigo-500/30">
-                                        <i class="fa-solid fa-id-card"></i>
+                            <!-- Right: Registered Faces & Today Attendance Feed -->
+                            <div class="lg:col-span-5 xl:col-span-4 space-y-6">
+                                <!-- Registered Faces Card -->
+                                <div class="bg-white rounded-2xl border border-surface-200/60 shadow-card p-5 sm:p-6">
+                                    <div class="flex items-center justify-between mb-3">
+                                        <div class="flex items-center gap-2.5">
+                                            <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs">
+                                                <i class="fa-solid fa-user-shield"></i>
+                                            </div>
+                                            <div>
+                                                <h4 class="text-sm font-bold text-surface-900">Data Wajah Caberawit</h4>
+                                                <p class="text-[11px] text-surface-400">
+                                                    Terdaftar: <span id="face-registered-count" class="font-bold text-indigo-600">0 / 0</span>
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <button type="button" onclick="setFaceSubMode('enroll')"
+                                            class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-semibold transition-colors">
+                                            + Daftar
+                                        </button>
                                     </div>
-                                    <div>
-                                        <h4 class="text-sm font-bold text-surface-900">QR Code Caberawit</h4>
-                                        <p class="text-[11px] text-surface-500">Lihat atau cetak kartu barcode peserta
-                                        </p>
+
+                                    <div class="relative mb-3">
+                                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 text-[11px]"></i>
+                                        <input type="text" id="face-list-search" oninput="renderFaceRegisteredList()"
+                                            placeholder="Cari nama caberawit..."
+                                            class="w-full pl-8 pr-3 py-1.5 text-xs bg-surface-50 border border-surface-200 rounded-xl focus:ring-2 focus:ring-indigo-500/30" />
+                                    </div>
+
+                                    <div id="face-registered-list"
+                                        class="space-y-2 max-h-[260px] overflow-y-auto custom-scrollbar pr-1">
+                                        <!-- Populated by JS -->
                                     </div>
                                 </div>
 
-                                <p class="text-xs text-surface-600 leading-relaxed mb-4">
-                                    Setiap Caberawit memiliki barcode QR unik. Pilih nama di bawah untuk melihat dan
-                                    mencetak kartu QR.
-                                </p>
+                                <!-- Live Feed Hari Ini (Shared summary) -->
+                                <div class="bg-white rounded-2xl border border-surface-200/60 shadow-card p-5 sm:p-6">
+                                    <div class="flex items-center justify-between mb-4">
+                                        <div class="flex items-center gap-2.5">
+                                            <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs">
+                                                <i class="fa-solid fa-clock-rotate-left"></i>
+                                            </div>
+                                            <div>
+                                                <h4 class="text-sm font-bold text-surface-900">Hasil Absensi Hari Ini</h4>
+                                                <p class="text-[11px] text-surface-400">Total: <span id="face-scanned-count"
+                                                        class="font-bold text-emerald-600">0</span> orang</p>
+                                            </div>
+                                        </div>
+                                        <span class="text-[10px] font-semibold text-surface-400 font-mono"
+                                            id="face-live-clock">--:--</span>
+                                    </div>
 
-                                <div class="space-y-3">
-                                    <select id="quick-qr-caberawit-select"
-                                        onchange="if(this.value) openCaberawitQRModal(this.value)"
-                                        class="w-full text-xs font-semibold bg-white border border-surface-200 rounded-xl px-3 py-2.5 text-surface-700 focus:ring-2 focus:ring-primary-500/30 cursor-pointer">
-                                        <option value="">-- Pilih Caberawit untuk Lihat QR --</option>
-                                    </select>
-
-                                    <button type="button" onclick="navigateTo('karyawan')"
-                                        class="w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 bg-white hover:bg-surface-50 text-indigo-700 text-xs font-semibold rounded-xl border border-indigo-200 transition-all shadow-xs">
-                                        <i class="fa-solid fa-users text-xs"></i> Kelola Data Caberawit
-                                    </button>
+                                    <div id="face-recent-list"
+                                        class="space-y-2.5 max-h-[260px] overflow-y-auto custom-scrollbar pr-1">
+                                        <div class="py-6 text-center text-surface-400 text-xs">
+                                            Belum ada absensi hari ini.
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1452,6 +1703,11 @@
                             <span>Kembali ke Data Caberawit</span>
                         </button>
                         <div class="flex flex-wrap items-center gap-2">
+                            <button type="button" id="detail-btn-face"
+                                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 text-xs font-semibold transition-all active:scale-95">
+                                <i class="fa-solid fa-face-smile"></i>
+                                <span id="detail-btn-face-label">Face ID</span>
+                            </button>
                             <button type="button" id="detail-btn-qr"
                                 class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/80 text-xs font-semibold transition-all active:scale-95">
                                 <i class="fa-solid fa-qrcode"></i>
@@ -3397,9 +3653,9 @@ Storage    : absensi-4d9c8.firebasestorage.app</code></pre>
                                     santri yang izin/sakit/alpa.
                                 </p>
                             </div>
-                            <button onclick="closeModal('modal-panduan-pengguna'); navigateTo('scan');"
+                            <button onclick="closeModal('modal-panduan-pengguna'); navigateTo('absensi', 'qr');"
                                 class="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-xl transition-all">
-                                <i class="fa-solid fa-qrcode text-xs"></i> Buka Scan QR Absensi &rarr;
+                                <i class="fa-solid fa-qrcode text-xs"></i> Buka Menu Absensi &rarr;
                             </button>
                         </div>
 
@@ -3746,9 +4002,9 @@ Storage    : absensi-4d9c8.firebasestorage.app</code></pre>
                         class="px-4 py-2 bg-surface-200 hover:bg-surface-300 text-surface-700 text-xs font-semibold rounded-xl transition-all">
                         Tutup
                     </button>
-                    <button type="button" onclick="closeModal('modal-panduan-pengguna'); navigateTo('scan');"
+                    <button type="button" onclick="closeModal('modal-panduan-pengguna'); navigateTo('absensi', 'qr');"
                         class="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white text-xs font-semibold rounded-xl shadow-md shadow-primary-500/25 active:scale-95 transition-all">
-                        <i class="fa-solid fa-qrcode text-xs"></i> Mulai Scan QR
+                        <i class="fa-solid fa-clipboard-check text-xs"></i> Mulai Absensi
                     </button>
                 </div>
             </div>
