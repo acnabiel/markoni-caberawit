@@ -52,6 +52,11 @@ try {
 // -----------------------------------------------
 let currentPage = 'dashboard';
 let attendanceChart = null;
+let userDetailChart = null;
+let currentDetailCaberawitId = null;
+let currentDetailTab = 'semua';
+let currentDetailPencapaianCategory = 'semua';
+let showAllDetailAttendance = false;
 let allAbsensiData = [];
 let allKaryawanData = [];
 let displayLimit = 10;
@@ -606,6 +611,7 @@ function setupRealtimeDbListeners() {
         updateChartData();
         renderRecentScansFeed();
         if (currentPage === 'rekap') filterRekapData();
+        refreshCaberawitDetailIfOpen();
     });
 
     // 2. Karyawan / Caberawit listener dengan auto-deduplikasi
@@ -633,6 +639,7 @@ function setupRealtimeDbListeners() {
         updateKaryawanDatalist();
         updateQuickQRCaberawitSelect();
         if (typeof populateRaportMuridSelect === 'function') populateRaportMuridSelect();
+        refreshCaberawitDetailIfOpen();
     });
 }
 
@@ -666,6 +673,7 @@ function setupFirestoreListeners() {
         updateChartData();
         renderRecentScansFeed();
         if (currentPage === 'rekap') filterRekapData();
+        refreshCaberawitDetailIfOpen();
     });
 
     // 2. Karyawan / Caberawit listener dengan auto-deduplikasi
@@ -693,6 +701,7 @@ function setupFirestoreListeners() {
         updateKaryawanDatalist();
         updateQuickQRCaberawitSelect();
         if (typeof populateRaportMuridSelect === 'function') populateRaportMuridSelect();
+        refreshCaberawitDetailIfOpen();
     });
 }
 
@@ -992,8 +1001,9 @@ function updateChartData() {
     updateChart(filter);
 }
 
-function calculateChartData(filter) {
+function calculateChartDataFromRecords(records, filter) {
     const result = { labels: [], hadir: [], izin: [], sakit: [], alpa: [] };
+    const source = Array.isArray(records) ? records : [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -1002,7 +1012,7 @@ function calculateChartData(filter) {
             const date = new Date(today);
             date.setDate(date.getDate() - i);
             const dateStr = formatDateISO(date);
-            const dayData = allAbsensiData.filter(item => item.tanggal === dateStr);
+            const dayData = source.filter(item => item.tanggal === dateStr);
 
             result.labels.push(formatDateShort(date));
             result.hadir.push(dayData.filter(d => d.status === 'Hadir').length);
@@ -1020,7 +1030,7 @@ function calculateChartData(filter) {
             const startStr = formatDateISO(weekStart);
             const endStr = formatDateISO(weekEnd);
 
-            const weekData = allAbsensiData.filter(item => item.tanggal >= startStr && item.tanggal <= endStr);
+            const weekData = source.filter(item => item.tanggal >= startStr && item.tanggal <= endStr);
 
             result.labels.push(`${formatDateShort(weekStart)} - ${formatDateShort(weekEnd)}`);
             result.hadir.push(weekData.filter(d => d.status === 'Hadir').length);
@@ -1036,7 +1046,7 @@ function calculateChartData(filter) {
             const mo = String(monthDate.getMonth() + 1).padStart(2, '0');
             const prefix = `${y}-${mo}`;
 
-            const monthData = allAbsensiData.filter(item => item.tanggal && item.tanggal.startsWith(prefix));
+            const monthData = source.filter(item => item.tanggal && item.tanggal.startsWith(prefix));
 
             result.labels.push(`${monthNames[monthDate.getMonth()]} ${y}`);
             result.hadir.push(monthData.filter(d => d.status === 'Hadir').length);
@@ -1046,6 +1056,10 @@ function calculateChartData(filter) {
         }
     }
     return result;
+}
+
+function calculateChartData(filter) {
+    return calculateChartDataFromRecords(allAbsensiData, filter);
 }
 
 
@@ -1077,6 +1091,7 @@ function setDashboardScope(scope) {
 
 function renderAttendanceTable() {
     const tbody = document.getElementById('attendance-table-body');
+    const cardList = document.getElementById('attendance-card-list');
     const emptyState = document.getElementById('table-empty');
     const countEl = document.getElementById('table-count');
     if (!tbody) return;
@@ -1100,6 +1115,7 @@ function renderAttendanceTable() {
 
     if (displayData.length === 0) {
         tbody.innerHTML = '';
+        if (cardList) cardList.innerHTML = '';
         emptyState?.classList.remove('hidden');
         emptyState?.classList.add('flex');
         if (countEl) countEl.textContent = '0';
@@ -1146,6 +1162,36 @@ function renderAttendanceTable() {
         </tr>
     `}).join('');
 
+    if (cardList) {
+        cardList.innerHTML = displayData.map(item => {
+            const isNew = LivewireEngine.isHighlighted(item.id);
+            const highlightClass = isNew ? 'livewire-row-highlight' : '';
+            return `
+            <div data-livewire-id="${item.id}" class="p-3.5 flex items-center justify-between gap-2.5 ${highlightClass}">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <div class="w-9 h-9 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                        ${getInitials(item.nama)}
+                    </div>
+                    <div class="min-w-0">
+                        <p class="text-sm font-semibold text-surface-900 truncate">${escapeHtml(item.nama)}</p>
+                        <p class="text-[11px] text-surface-400">${formatDateDisplay(item.tanggal)} • <span class="font-mono">${escapeHtml(item.jam || '-')}</span></p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1.5 shrink-0">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold badge-${item.status.toLowerCase()}">
+                        ${getStatusIcon(item.status)} ${item.status}
+                    </span>
+                    <button onclick="openEditModal('${item.id}')" class="p-1.5 rounded-lg text-surface-400 hover:text-primary-600 hover:bg-primary-50" title="Edit">
+                        <i class="fa-solid fa-pen-to-square text-xs"></i>
+                    </button>
+                    <button onclick="deleteAbsensi('${item.id}')" class="p-1.5 rounded-lg text-surface-400 hover:text-rose-600 hover:bg-rose-50" title="Hapus">
+                        <i class="fa-solid fa-trash-can text-xs"></i>
+                    </button>
+                </div>
+            </div>
+        `}).join('');
+    }
+
     if (countEl) countEl.textContent = filtered.length;
 }
 
@@ -1188,6 +1234,7 @@ function filterRekapData() {
 
 function renderRekapTable(data) {
     const tbody = document.getElementById('rekap-table-body');
+    const cardList = document.getElementById('rekap-card-list');
     const emptyState = document.getElementById('rekap-empty');
     if (!tbody) return;
 
@@ -1195,6 +1242,7 @@ function renderRekapTable(data) {
 
     if (!data || data.length === 0) {
         tbody.innerHTML = '';
+        if (cardList) cardList.innerHTML = '';
         emptyState?.classList.remove('hidden');
         emptyState?.classList.add('flex');
         updateRekapBulkUI();
@@ -1245,6 +1293,37 @@ function renderRekapTable(data) {
             </td>
         </tr>
     `}).join('');
+
+    if (cardList) {
+        cardList.innerHTML = data.map(item => {
+            const isSelected = selectedRekapIds.has(item.id);
+            const isNew = LivewireEngine.isHighlighted(item.id);
+            const highlightClass = isNew ? 'livewire-row-highlight' : '';
+            return `
+            <div data-livewire-id="${item.id}" class="p-3.5 flex items-center justify-between gap-2.5 ${isSelected ? 'row-selected' : ''} ${highlightClass}">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <input type="checkbox" class="table-checkbox w-4 h-4 rounded text-primary-600 border-surface-300 shrink-0"
+                        data-id="${item.id}" ${isSelected ? 'checked' : ''}
+                        onchange="toggleRekapRow('${item.id}', this.checked)" />
+                    <div class="min-w-0">
+                        <p class="text-sm font-semibold text-surface-900 truncate">${escapeHtml(item.nama)}</p>
+                        <p class="text-[11px] text-surface-400">${formatDateDisplay(item.tanggal)} • <span class="font-mono">${escapeHtml(item.jam || '-')}</span></p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1.5 shrink-0">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold badge-${item.status.toLowerCase()}">
+                        ${getStatusIcon(item.status)} ${item.status}
+                    </span>
+                    <button onclick="openEditModal('${item.id}')" class="p-1.5 rounded-lg text-surface-400 hover:text-primary-600" title="Edit">
+                        <i class="fa-solid fa-pen-to-square text-xs"></i>
+                    </button>
+                    <button onclick="deleteAbsensi('${item.id}')" class="p-1.5 rounded-lg text-surface-400 hover:text-rose-600" title="Hapus">
+                        <i class="fa-solid fa-trash-can text-xs"></i>
+                    </button>
+                </div>
+            </div>
+        `}).join('');
+    }
 
     updateRekapBulkUI();
 }
@@ -1842,6 +1921,7 @@ async function handleUpdateAbsensi(event) {
     renderInputAbsensiPreviewTable();
     updateChartData();
     if (currentPage === 'rekap') filterRekapData();
+    refreshCaberawitDetailIfOpen();
 
     LivewireEngine.stopLoading('dashboard-absensi');
     LivewireEngine.stopLoading('absensi-preview');
@@ -1889,6 +1969,7 @@ async function deleteAbsensi(id) {
 
 function renderKaryawanTable(data) {
     const tbody = document.getElementById('karyawan-table-body');
+    const cardList = document.getElementById('karyawan-card-list');
     const emptyState = document.getElementById('karyawan-empty');
     const countEl = document.getElementById('karyawan-count');
 
@@ -1898,6 +1979,7 @@ function renderKaryawanTable(data) {
 
     if (!data || data.length === 0) {
         tbody.innerHTML = '';
+        if (cardList) cardList.innerHTML = '';
         emptyState?.classList.remove('hidden');
         emptyState?.classList.add('flex');
         updateKaryawanBulkUI();
@@ -1907,6 +1989,7 @@ function renderKaryawanTable(data) {
     emptyState?.classList.add('hidden');
     emptyState?.classList.remove('flex');
 
+    // Desktop Table: Ringkas & Clean (Nama, Kelompok/Kelas, Aksi; Detail lengkap di view detail)
     tbody.innerHTML = data.map((item, index) => {
         const isSelected = selectedKaryawanIds.has(item.id);
         const isNew = LivewireEngine.isHighlighted(item.id);
@@ -1919,23 +2002,26 @@ function renderKaryawanTable(data) {
                     ${isSelected ? 'checked' : ''}
                     onchange="toggleKaryawanRow('${item.id}', this.checked)" />
             </td>
-            <td class="px-6 py-3.5 text-sm text-surface-400 font-medium">${index + 1}</td>
-            <td class="px-6 py-3.5">
-                <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white text-xs font-bold shadow-sm">
+            <td class="px-5 py-3.5 text-sm text-surface-400 font-medium">${index + 1}</td>
+            <td class="px-5 py-3.5">
+                <button type="button" onclick="openCaberawitDetail('${item.id}')" class="flex items-center gap-3 text-left group/name">
+                    <div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white text-xs font-bold shadow-sm shrink-0">
                         ${getInitials(item.nama)}
                     </div>
-                    <span class="text-sm font-semibold text-surface-800">${escapeHtml(item.nama)}</span>
-                </div>
+                    <span class="text-sm font-semibold text-surface-800 group-hover/name:text-primary-600 transition-colors">${escapeHtml(item.nama)}</span>
+                </button>
             </td>
-            <td class="px-6 py-3.5 text-sm text-surface-600 font-medium">${escapeHtml(item.jabatan || '-')}</td>
-            <td class="px-6 py-3.5 text-xs text-surface-500">
-                ${item.email ? `<div><i class="fa-regular fa-envelope text-surface-400 mr-1"></i>${escapeHtml(item.email)}</div>` : ''}
-                ${item.telepon ? `<div class="mt-0.5"><i class="fa-solid fa-phone text-surface-400 mr-1"></i>${escapeHtml(item.telepon)}</div>` : ''}
-                ${!item.email && !item.telepon ? '-' : ''}
+            <td class="px-5 py-3.5">
+                <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-surface-100 text-surface-700">
+                    ${escapeHtml(item.jabatan || '-')}
+                </span>
             </td>
-            <td class="px-6 py-3.5">
-                <div class="flex items-center gap-1.5">
+            <td class="px-5 py-3.5">
+                <div class="flex items-center justify-end gap-1.5">
+                    <button onclick="openCaberawitDetail('${item.id}')" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary-50 hover:bg-primary-100 text-primary-700 text-xs font-semibold transition-colors" title="Lihat Detail Lengkap">
+                        <i class="fa-solid fa-eye text-[11px]"></i>
+                        <span>Detail</span>
+                    </button>
                     <button onclick="openCaberawitQRModal('${item.id}')" class="p-1.5 rounded-lg hover:bg-emerald-50 text-surface-400 hover:text-emerald-600 transition-colors" title="Lihat & Cetak QR Code">
                         <i class="fa-solid fa-qrcode text-xs"></i>
                     </button>
@@ -1949,6 +2035,40 @@ function renderKaryawanTable(data) {
             </td>
         </tr>
     `}).join('');
+
+    // Mobile Clean Compact Cards: Hanya Nama, Role/Kelas, dan tombol Detail (+ aksi ringkas)
+    if (cardList) {
+        cardList.innerHTML = data.map(item => {
+            const isSelected = selectedKaryawanIds.has(item.id);
+            const isNew = LivewireEngine.isHighlighted(item.id);
+            const highlightClass = isNew ? 'livewire-row-highlight' : '';
+            return `
+            <div data-livewire-id="${item.id}" class="p-3.5 flex items-center justify-between gap-2.5 ${isSelected ? 'row-selected' : ''} ${highlightClass}">
+                <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                    <input type="checkbox" class="table-checkbox w-4 h-4 rounded text-primary-600 border-surface-300 shrink-0"
+                        data-id="${item.id}" ${isSelected ? 'checked' : ''}
+                        onchange="toggleKaryawanRow('${item.id}', this.checked)" />
+                    <button type="button" onclick="openCaberawitDetail('${item.id}')" class="flex items-center gap-2.5 min-w-0 flex-1 text-left">
+                        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                            ${getInitials(item.nama)}
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-sm font-semibold text-surface-900 truncate">${escapeHtml(item.nama)}</p>
+                            <p class="text-[11px] text-surface-400 truncate">${escapeHtml(item.jabatan || 'Caberawit')}</p>
+                        </div>
+                    </button>
+                </div>
+                <div class="flex items-center gap-1 shrink-0">
+                    <button onclick="openCaberawitDetail('${item.id}')" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary-50 text-primary-700 text-xs font-semibold active:scale-95 transition-all" title="Detail">
+                        <i class="fa-solid fa-chevron-right text-[10px]"></i> Detail
+                    </button>
+                    <button onclick="openCaberawitQRModal('${item.id}')" class="p-1.5 rounded-lg text-surface-400 hover:text-emerald-600" title="QR Code">
+                        <i class="fa-solid fa-qrcode text-xs"></i>
+                    </button>
+                </div>
+            </div>
+        `}).join('');
+    }
 
     updateKaryawanBulkUI();
 }
@@ -2094,7 +2214,9 @@ function filterKaryawanTable(query) {
             const filtered = allKaryawanData.filter(k =>
                 (k.nama || '').toLowerCase().includes(q) ||
                 (k.jabatan || '').toLowerCase().includes(q) ||
-                (k.email || '').toLowerCase().includes(q)
+                (k.email || '').toLowerCase().includes(q) ||
+                (k.telepon || '').toLowerCase().includes(q) ||
+                (k.namaOrangTua || '').toLowerCase().includes(q)
             );
             renderKaryawanTable(filtered);
         }
@@ -2186,16 +2308,17 @@ async function handleSubmitKaryawan(event) {
 
     if (isSubmittingKaryawan) return;
 
-    const namaInput = document.getElementById('karyawan-nama');
-    const jabatanInput = document.getElementById('karyawan-jabatan');
-    const emailInput = document.getElementById('karyawan-email');
-    const teleponInput = document.getElementById('karyawan-telepon');
+    const nama = document.getElementById('karyawan-nama')?.value.trim() || '';
+    const jabatan = document.getElementById('karyawan-jabatan')?.value.trim() || '';
+    const jenisKelamin = document.getElementById('karyawan-gender')?.value || '';
+    const tempatLahir = document.getElementById('karyawan-tempat-lahir')?.value.trim() || '';
+    const tanggalLahir = document.getElementById('karyawan-tanggal-lahir')?.value || '';
+    const namaOrangTua = document.getElementById('karyawan-orangtua')?.value.trim() || '';
+    const telepon = document.getElementById('karyawan-telepon')?.value.trim() || '';
+    const email = document.getElementById('karyawan-email')?.value.trim() || '';
+    const alamat = document.getElementById('karyawan-alamat')?.value.trim() || '';
+    const catatan = document.getElementById('karyawan-catatan')?.value.trim() || '';
     const submitBtn = document.querySelector('#karyawan-form button[type="submit"]');
-
-    const nama = namaInput ? namaInput.value.trim() : '';
-    const jabatan = jabatanInput ? jabatanInput.value.trim() : '';
-    const email = emailInput ? emailInput.value.trim() : '';
-    const telepon = teleponInput ? teleponInput.value.trim() : '';
 
     if (!nama || !jabatan) {
         showToast('Mohon lengkapi nama dan role Caberawit!', 'error');
@@ -2215,12 +2338,19 @@ async function handleSubmitKaryawan(event) {
         submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i> Menyimpan...';
     }
 
-    const newKaryawan = { 
-        nama, 
-        jabatan, 
-        email, 
-        telepon, 
-        createdAt: Date.now() 
+    const newKaryawan = {
+        nama,
+        jabatan,
+        jenisKelamin,
+        tempatLahir,
+        tanggalLahir,
+        namaOrangTua,
+        telepon,
+        email,
+        alamat,
+        catatan,
+        pencapaian: createDefaultPencapaianList(),
+        createdAt: Date.now()
     };
 
     try {
@@ -2283,10 +2413,18 @@ function openEditKaryawanModal(id) {
     document.getElementById('edit-karyawan-id').value = id;
     document.getElementById('edit-karyawan-nama').value = item.nama || '';
     document.getElementById('edit-karyawan-jabatan').value = item.jabatan || '';
-    const emailEl = document.getElementById('edit-karyawan-email');
-    const telEl = document.getElementById('edit-karyawan-telepon');
-    if (emailEl) emailEl.value = item.email || '';
-    if (telEl) telEl.value = item.telepon || '';
+    const setVal = (elId, val) => {
+        const el = document.getElementById(elId);
+        if (el) el.value = val || '';
+    };
+    setVal('edit-karyawan-gender', item.jenisKelamin);
+    setVal('edit-karyawan-tempat-lahir', item.tempatLahir);
+    setVal('edit-karyawan-tanggal-lahir', item.tanggalLahir);
+    setVal('edit-karyawan-orangtua', item.namaOrangTua);
+    setVal('edit-karyawan-telepon', item.telepon);
+    setVal('edit-karyawan-email', item.email);
+    setVal('edit-karyawan-alamat', item.alamat);
+    setVal('edit-karyawan-catatan', item.catatan);
 
     openModal('modal-edit-karyawan');
 }
@@ -2298,8 +2436,14 @@ async function handleUpdateKaryawan(event) {
     const updated = {
         nama: document.getElementById('edit-karyawan-nama').value.trim(),
         jabatan: document.getElementById('edit-karyawan-jabatan').value.trim(),
+        jenisKelamin: document.getElementById('edit-karyawan-gender')?.value || '',
+        tempatLahir: document.getElementById('edit-karyawan-tempat-lahir')?.value.trim() || '',
+        tanggalLahir: document.getElementById('edit-karyawan-tanggal-lahir')?.value || '',
+        namaOrangTua: document.getElementById('edit-karyawan-orangtua')?.value.trim() || '',
+        telepon: document.getElementById('edit-karyawan-telepon')?.value.trim() || '',
         email: document.getElementById('edit-karyawan-email')?.value.trim() || '',
-        telepon: document.getElementById('edit-karyawan-telepon')?.value.trim() || ''
+        alamat: document.getElementById('edit-karyawan-alamat')?.value.trim() || '',
+        catatan: document.getElementById('edit-karyawan-catatan')?.value.trim() || ''
     };
 
     if (isFirebaseConnected) {
@@ -2316,9 +2460,10 @@ async function handleUpdateKaryawan(event) {
     LivewireEngine.highlightRow(id);
     renderKaryawanTable(allKaryawanData);
     updateKaryawanDatalist();
+    refreshCaberawitDetailIfOpen();
 
     closeModal('modal-edit-karyawan');
-    showToast('Data karyawan berhasil diperbarui!', 'success');
+    showToast('Data caberawit berhasil diperbarui!', 'success');
 }
 
 async function deleteKaryawan(id) {
@@ -2390,7 +2535,8 @@ function navigateTo(page) {
     }
 
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-    document.getElementById(`nav-${page}`)?.classList.add('active');
+    const navKey = page === 'caberawit-detail' ? 'karyawan' : page;
+    document.getElementById(`nav-${navKey}`)?.classList.add('active');
 
     const titles = {
         dashboard: { title: 'Dashboard', subtitle: 'Ringkasan data kehadiran hari ini' },
@@ -2398,6 +2544,7 @@ function navigateTo(page) {
         scan: { title: 'Scan QR Absensi', subtitle: 'Pindai barcode QR untuk absensi otomatis (Mobile & Desktop)' },
         rekap: { title: 'Rekap Data', subtitle: 'Filter dan kelola data absensi' },
         karyawan: { title: 'Data Caberawit', subtitle: 'Kelola data peserta caberawit terdaftar' },
+        'caberawit-detail': { title: 'Detail Caberawit', subtitle: 'Biodata, kehadiran, raport & pencapaian individu' },
         jurnal: { title: 'Jurnal Guru & KBM', subtitle: 'Catatan kegiatan belajar mengajar harian' },
         raport: { title: 'Raport Caberawit', subtitle: 'Evaluasi kekurangan materi & perkembangan murid untuk orang tua' },
         pengaturan: { title: 'Pengaturan', subtitle: 'Konfigurasi sistem & database absensi' }
@@ -2415,6 +2562,8 @@ function navigateTo(page) {
         filterRekapData();
     } else if (page === 'karyawan') {
         renderKaryawanTable(allKaryawanData);
+    } else if (page === 'caberawit-detail') {
+        renderCurrentCaberawitDetail();
     } else if (page === 'jurnal') {
         renderJurnalData();
     } else if (page === 'raport') {
@@ -4394,6 +4543,7 @@ function setupRaportRtdbListener() {
         }
         saveRaportToLocalStorage();
         renderRaportData();
+        refreshCaberawitDetailIfOpen();
     });
 }
 
@@ -4411,6 +4561,7 @@ function setupRaportFirestoreListener() {
         }
         saveRaportToLocalStorage();
         renderRaportData();
+        refreshCaberawitDetailIfOpen();
     });
 }
 
@@ -4562,6 +4713,7 @@ async function handleSubmitRaport(event) {
     LivewireEngine.highlightRow(id);
     closeModal('modal-raport');
     renderRaportData();
+    refreshCaberawitDetailIfOpen();
     showToast(editId ? 'Data raport berhasil diperbarui!' : 'Raport baru berhasil dicatat & disimpan!', 'success');
 }
 
@@ -4589,6 +4741,7 @@ async function executeDeleteRaport() {
     pendingDeleteRaportId = null;
     closeModal('modal-delete-raport');
     renderRaportData();
+    refreshCaberawitDetailIfOpen();
     showToast('Raport berhasil dihapus.', 'info');
 }
 
@@ -5123,6 +5276,584 @@ function copyRaportLink(id) {
     }).catch(() => {
         prompt('Salin tautan ini:', url);
     });
+}
+
+
+// -----------------------------------------------
+// 22. DETAIL CABERAWIT (BIODATA, GRAFIK, RAPORT, PENCAPAIAN GURU)
+// -----------------------------------------------
+
+const DEFAULT_PENCAPAIAN_TEMPLATE = [
+    { id: 'ach-baca-1', title: 'Bacaan Iqro / Tilawati Jilid 1 - 2', category: 'Bacaan', checked: false, checkedAt: '', isCustom: false },
+    { id: 'ach-baca-2', title: 'Bacaan Iqro / Tilawati Jilid 3 - 4', category: 'Bacaan', checked: false, checkedAt: '', isCustom: false },
+    { id: 'ach-baca-3', title: 'Bacaan Iqro / Tilawati Jilid 5 - 6', category: 'Bacaan', checked: false, checkedAt: '', isCustom: false },
+    { id: 'ach-baca-4', title: 'Kelancaran Membaca Al-Qur\'an & Tajwid Dasar', category: 'Bacaan', checked: false, checkedAt: '', isCustom: false },
+    { id: 'ach-hafal-1', title: 'Hafalan Surat Al-Fatihah & Surat Pendek (An-Nas s/d Al-Asr)', category: 'Hafalan', checked: false, checkedAt: '', isCustom: false },
+    { id: 'ach-hafal-2', title: 'Hafalan Doa Sehari-hari (Tidur, Makan, Masuk/Keluar Masjid)', category: 'Hafalan', checked: false, checkedAt: '', isCustom: false },
+    { id: 'ach-hafal-3', title: 'Hafalan Asmaul Husna', category: 'Hafalan', checked: false, checkedAt: '', isCustom: false },
+    { id: 'ach-ibadah-1', title: 'Praktik & Bacaan Wudhu dengan Tertib', category: 'Praktik Ibadah', checked: false, checkedAt: '', isCustom: false },
+    { id: 'ach-ibadah-2', title: 'Gerakan & Bacaan Sholat Fardhu', category: 'Praktik Ibadah', checked: false, checkedAt: '', isCustom: false },
+    { id: 'ach-ibadah-3', title: 'Lafadz Adzan, Iqomah & Doa Setelah Sholat', category: 'Praktik Ibadah', checked: false, checkedAt: '', isCustom: false },
+    { id: 'ach-akhlak-1', title: 'Adab & Tata Krama kepada Orang Tua dan Guru', category: 'Akhlak & Lainnya', checked: false, checkedAt: '', isCustom: false },
+    { id: 'ach-akhlak-2', title: 'Kedisiplinan Hadir & Kebersihan Diri', category: 'Akhlak & Lainnya', checked: false, checkedAt: '', isCustom: false }
+];
+
+function createDefaultPencapaianList() {
+    return DEFAULT_PENCAPAIAN_TEMPLATE.map(item => ({ ...item }));
+}
+
+function getUserPencapaianList(user) {
+    if (user && Array.isArray(user.pencapaian) && user.pencapaian.length > 0) {
+        return user.pencapaian;
+    }
+    return createDefaultPencapaianList();
+}
+
+function openCaberawitDetail(id) {
+    const user = allKaryawanData.find(k => k.id === id);
+    if (!user) {
+        showToast('Data caberawit tidak ditemukan.', 'error');
+        return;
+    }
+    currentDetailCaberawitId = id;
+    currentDetailTab = 'semua';
+    currentDetailPencapaianCategory = 'semua';
+    showAllDetailAttendance = false;
+    navigateTo('caberawit-detail');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function closeCaberawitDetail() {
+    currentDetailCaberawitId = null;
+    navigateTo('karyawan');
+}
+
+function refreshCaberawitDetailIfOpen() {
+    if (currentPage === 'caberawit-detail' && currentDetailCaberawitId) {
+        renderCurrentCaberawitDetail();
+    }
+}
+
+function setDetailTab(tab) {
+    currentDetailTab = tab;
+    document.querySelectorAll('.detail-tab-btn').forEach(btn => {
+        btn.className = 'detail-tab-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-surface-100 text-surface-600 hover:bg-surface-200 shrink-0 transition-all';
+    });
+    const activeBtn = document.getElementById(`detail-tab-${tab}`);
+    if (activeBtn) {
+        activeBtn.className = 'detail-tab-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-primary-600 text-white shrink-0 transition-all';
+    }
+
+    const panels = ['biodata', 'kehadiran', 'raport', 'pencapaian'];
+    panels.forEach(p => {
+        const el = document.getElementById(`detail-panel-${p}`);
+        if (!el) return;
+        if (tab === 'semua' || tab === p) {
+            el.classList.remove('hidden');
+        } else {
+            el.classList.add('hidden');
+        }
+    });
+
+    // Pastikan ApexCharts merender ulang lebarnya saat panel kehadiran dibuka
+    if (tab === 'semua' || tab === 'kehadiran') {
+        const user = allKaryawanData.find(k => k.id === currentDetailCaberawitId);
+        if (user) {
+            setTimeout(() => updateUserDetailChart(document.getElementById('detail-chart-filter')?.value || 'mingguan', user), 60);
+        }
+    }
+}
+
+function renderCurrentCaberawitDetail() {
+    const user = allKaryawanData.find(k => k.id === currentDetailCaberawitId);
+    if (!user) {
+        closeCaberawitDetail();
+        return;
+    }
+
+    // Header & Hero
+    const avatarEl = document.getElementById('detail-avatar');
+    const namaEl = document.getElementById('detail-nama');
+    const roleEl = document.getElementById('detail-role');
+    const idEl = document.getElementById('detail-id');
+    const genderBadgeEl = document.getElementById('detail-gender-badge');
+    const subtitleEl = document.getElementById('page-subtitle');
+
+    if (avatarEl) avatarEl.textContent = getInitials(user.nama);
+    if (namaEl) namaEl.textContent = user.nama || '-';
+    if (roleEl) roleEl.textContent = user.jabatan || 'Peserta Caberawit';
+    if (idEl) idEl.textContent = `ID: ${user.id}`;
+    if (subtitleEl) subtitleEl.textContent = `${user.nama} • ${user.jabatan || 'Caberawit'}`;
+
+    if (genderBadgeEl) {
+        if (user.jenisKelamin) {
+            genderBadgeEl.textContent = user.jenisKelamin;
+            genderBadgeEl.classList.remove('hidden');
+        } else {
+            genderBadgeEl.classList.add('hidden');
+        }
+    }
+
+    // Action buttons
+    const btnQr = document.getElementById('detail-btn-qr');
+    const btnEdit = document.getElementById('detail-btn-edit');
+    const btnEditBio = document.getElementById('detail-btn-edit-bio');
+    const btnAddRaport = document.getElementById('detail-btn-add-raport');
+    if (btnQr) btnQr.onclick = () => openCaberawitQRModal(user.id);
+    if (btnEdit) btnEdit.onclick = () => openEditKaryawanModal(user.id);
+    if (btnEditBio) btnEditBio.onclick = () => openEditKaryawanModal(user.id);
+    if (btnAddRaport) btnAddRaport.onclick = () => openAddRaportForUser(user.nama);
+
+    renderDetailBiodata(user);
+    renderDetailAttendance(user);
+    renderDetailRaport(user);
+    renderDetailPencapaian(user);
+    setDetailTab(currentDetailTab);
+}
+
+function calculateAgeText(dateStr) {
+    if (!dateStr) return '';
+    const birth = new Date(dateStr);
+    if (isNaN(birth.getTime())) return '';
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+        age--;
+    }
+    return age >= 0 ? `(${age} tahun)` : '';
+}
+
+function formatWaNumber(phone) {
+    if (!phone) return '';
+    let digits = phone.replace(/[^0-9]/g, '');
+    if (digits.startsWith('0')) digits = '62' + digits.substring(1);
+    return digits;
+}
+
+function renderDetailBiodata(user) {
+    const grid = document.getElementById('detail-biodata-grid');
+    if (!grid) return;
+
+    const ttlParts = [];
+    if (user.tempatLahir) ttlParts.push(user.tempatLahir);
+    if (user.tanggalLahir) ttlParts.push(formatDateDisplay(user.tanggalLahir));
+    const ageText = calculateAgeText(user.tanggalLahir);
+    const ttlDisplay = ttlParts.length > 0 ? `${ttlParts.join(', ')} ${ageText}`.trim() : '';
+
+    const waDigits = formatWaNumber(user.telepon);
+    const phoneActions = user.telepon ? `
+        <div class="flex items-center gap-2 mt-1.5">
+            <a href="https://wa.me/${waDigits}" target="_blank" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-semibold border border-emerald-200 transition-colors">
+                <i class="fa-brands fa-whatsapp"></i> Chat WA
+            </a>
+            <a href="tel:${escapeHtml(user.telepon)}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-semibold border border-blue-200 transition-colors">
+                <i class="fa-solid fa-phone text-[9px]"></i> Telepon
+            </a>
+        </div>
+    ` : '';
+
+    const bioItems = [
+        { icon: 'fa-user', label: 'Nama Lengkap', value: user.nama, color: 'text-primary-600 bg-primary-50' },
+        { icon: 'fa-cake-candles', label: 'Tempat, Tanggal Lahir', value: ttlDisplay, color: 'text-rose-600 bg-rose-50' },
+        { icon: 'fa-venus-mars', label: 'Jenis Kelamin', value: user.jenisKelamin, color: 'text-indigo-600 bg-indigo-50' },
+        { icon: 'fa-people-roof', label: 'Nama Orang Tua / Wali', value: user.namaOrangTua, color: 'text-amber-600 bg-amber-50' },
+        { icon: 'fa-mobile-screen', label: 'No. HP / WhatsApp', value: user.telepon, extraHtml: phoneActions, color: 'text-emerald-600 bg-emerald-50' },
+        { icon: 'fa-envelope', label: 'Email', value: user.email, color: 'text-sky-600 bg-sky-50' },
+        { icon: 'fa-location-dot', label: 'Alamat Lengkap', value: user.alamat, color: 'text-violet-600 bg-violet-50', spanFull: true },
+        { icon: 'fa-note-sticky', label: 'Catatan Tambahan', value: user.catatan, color: 'text-surface-600 bg-surface-100', spanFull: !!user.catatan }
+    ];
+
+    grid.innerHTML = bioItems.filter(item => item.label !== 'Catatan Tambahan' || item.value).map(item => `
+        <div class="p-3.5 rounded-xl bg-surface-50/70 border border-surface-100 flex items-start gap-3 ${item.spanFull ? 'sm:col-span-2 lg:col-span-3' : ''}">
+            <div class="w-8 h-8 rounded-lg ${item.color} flex items-center justify-center text-xs shrink-0 mt-0.5">
+                <i class="fa-solid ${item.icon}"></i>
+            </div>
+            <div class="min-w-0 flex-1">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-surface-400">${item.label}</p>
+                <p class="text-xs sm:text-sm font-semibold ${item.value ? 'text-surface-800' : 'text-surface-400 italic font-normal'} mt-0.5 break-words">
+                    ${item.value ? escapeHtml(item.value) : 'Belum diisi'}
+                </p>
+                ${item.extraHtml || ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+function getUserAttendanceRecords(user) {
+    if (!user) return [];
+    const targetName = (user.nama || '').trim().toLowerCase();
+    return allAbsensiData
+        .filter(a => (a.nama || '').trim().toLowerCase() === targetName || (a.karyawanId && a.karyawanId === user.id))
+        .sort((a, b) => {
+            const tA = Number(a.timestamp) || new Date(`${a.tanggal} ${a.jam || '00:00'}`).getTime() || 0;
+            const tB = Number(b.timestamp) || new Date(`${b.tanggal} ${b.jam || '00:00'}`).getTime() || 0;
+            return tB - tA;
+        });
+}
+
+function renderDetailAttendance(user) {
+    const records = getUserAttendanceRecords(user);
+    const hadir = records.filter(r => r.status === 'Hadir').length;
+    const izin = records.filter(r => r.status === 'Izin').length;
+    const sakit = records.filter(r => r.status === 'Sakit').length;
+    const alpa = records.filter(r => r.status === 'Alpa').length;
+    const total = records.length;
+    const persen = total > 0 ? Math.round((hadir / total) * 100) : 0;
+
+    const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    setTxt('detail-stat-hadir', hadir);
+    setTxt('detail-stat-izin', izin);
+    setTxt('detail-stat-sakit', sakit);
+    setTxt('detail-stat-alpa', alpa);
+    setTxt('detail-hero-persen', `${persen}%`);
+
+    const filter = document.getElementById('detail-chart-filter')?.value || 'mingguan';
+    updateUserDetailChart(filter, user);
+
+    // Render compact list
+    const listEl = document.getElementById('detail-attendance-list');
+    const toggleBtn = document.getElementById('detail-toggle-absensi-btn');
+    if (!listEl) return;
+
+    if (records.length === 0) {
+        if (toggleBtn) toggleBtn.classList.add('hidden');
+        listEl.innerHTML = `
+            <div class="p-6 text-center text-xs text-surface-400">
+                <i class="fa-regular fa-calendar-xmark text-xl text-surface-300 mb-1.5 block"></i>
+                Belum ada riwayat absensi untuk caberawit ini.
+            </div>
+        `;
+        return;
+    }
+
+    if (toggleBtn) {
+        if (records.length > 5) {
+            toggleBtn.classList.remove('hidden');
+            toggleBtn.textContent = showAllDetailAttendance ? 'Tampilkan Ringkas' : `Lihat Semua (${records.length})`;
+        } else {
+            toggleBtn.classList.add('hidden');
+        }
+    }
+
+    const visibleRecords = showAllDetailAttendance ? records : records.slice(0, 5);
+    listEl.innerHTML = visibleRecords.map(item => `
+        <div class="px-3.5 py-2.5 flex items-center justify-between gap-2 bg-white hover:bg-surface-50 transition-colors">
+            <div class="min-w-0">
+                <p class="text-xs sm:text-sm font-semibold text-surface-800">${formatDateDisplay(item.tanggal)}</p>
+                <p class="text-[11px] text-surface-400 truncate">
+                    <span class="font-mono">${escapeHtml(item.jam || '-')}</span>${item.keterangan ? ` • ${escapeHtml(item.keterangan)}` : ''}
+                </p>
+            </div>
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold badge-${(item.status || '').toLowerCase()} shrink-0">
+                ${getStatusIcon(item.status)} ${escapeHtml(item.status)}
+            </span>
+        </div>
+    `).join('');
+}
+
+function toggleDetailAttendanceAll() {
+    showAllDetailAttendance = !showAllDetailAttendance;
+    const user = allKaryawanData.find(k => k.id === currentDetailCaberawitId);
+    if (user) renderDetailAttendance(user);
+}
+
+function initUserDetailChart() {
+    const chartEl = document.getElementById('user-attendance-chart');
+    if (!chartEl || typeof ApexCharts === 'undefined') return null;
+
+    const options = {
+        series: [
+            { name: 'Hadir', data: [] },
+            { name: 'Izin', data: [] },
+            { name: 'Sakit', data: [] },
+            { name: 'Alpa', data: [] }
+        ],
+        chart: {
+            type: 'area',
+            height: 280,
+            fontFamily: 'Inter, system-ui, sans-serif',
+            toolbar: { show: true, tools: { download: true, selection: false, zoom: false, zoomin: false, zoomout: false, pan: false, reset: false } },
+            animations: { enabled: true, easing: 'easeinout', speed: 450 }
+        },
+        colors: ['#10b981', '#f59e0b', '#3b82f6', '#ef4444'],
+        stroke: { curve: 'smooth', width: 2.5 },
+        fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.25, opacityTo: 0.05, stops: [0, 90, 100] } },
+        dataLabels: { enabled: false },
+        xaxis: {
+            categories: [],
+            labels: { style: { colors: '#64748b', fontSize: '11px', fontWeight: 500 } },
+            axisBorder: { show: false },
+            axisTicks: { show: false }
+        },
+        yaxis: {
+            min: 0,
+            forceNiceScale: true,
+            labels: {
+                style: { colors: '#64748b', fontSize: '11px', fontWeight: 500 },
+                formatter: (val) => Math.round(val)
+            }
+        },
+        grid: { borderColor: '#f1f5f9', strokeDashArray: 4, xaxis: { lines: { show: false } }, yaxis: { lines: { show: true } } },
+        legend: { position: 'top', horizontalAlign: 'right', fontSize: '12px', fontWeight: 600, labels: { colors: '#475569' }, markers: { radius: 4, width: 10, height: 10 } },
+        tooltip: { shared: true, intersect: false, y: { formatter: (val) => `${val} kali` } }
+    };
+
+    if (userDetailChart) {
+        try { userDetailChart.destroy(); } catch (e) {}
+    }
+    userDetailChart = new ApexCharts(chartEl, options);
+    userDetailChart.render();
+    return userDetailChart;
+}
+
+function updateUserDetailChart(filter, userOverride = null) {
+    const user = userOverride || allKaryawanData.find(k => k.id === currentDetailCaberawitId);
+    if (!user) return;
+    if (!filter) filter = document.getElementById('detail-chart-filter')?.value || 'mingguan';
+
+    const chartEl = document.getElementById('user-attendance-chart');
+    if (!chartEl) return;
+
+    if (!userDetailChart || !chartEl.querySelector('.apexcharts-canvas')) {
+        initUserDetailChart();
+    }
+    if (!userDetailChart) return;
+
+    const userRecords = getUserAttendanceRecords(user);
+    const chartData = calculateChartDataFromRecords(userRecords, filter);
+
+    userDetailChart.updateOptions({
+        xaxis: { categories: chartData.labels },
+        series: [
+            { name: 'Hadir', data: chartData.hadir },
+            { name: 'Izin', data: chartData.izin },
+            { name: 'Sakit', data: chartData.sakit },
+            { name: 'Alpa', data: chartData.alpa }
+        ]
+    });
+}
+
+function renderDetailRaport(user) {
+    const listEl = document.getElementById('detail-raport-list');
+    const badgeEl = document.getElementById('detail-raport-status-badge');
+    const heroEl = document.getElementById('detail-hero-raport');
+    if (!listEl) return;
+
+    const targetName = (user.nama || '').trim().toLowerCase();
+    const userRaports = allRaportData.filter(r => (r.nama || '').trim().toLowerCase() === targetName);
+
+    if (heroEl) heroEl.textContent = userRaports.length;
+
+    if (userRaports.length === 0) {
+        if (badgeEl) {
+            badgeEl.textContent = 'Belum Memiliki Raport';
+            badgeEl.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700';
+        }
+        listEl.innerHTML = `
+            <div class="p-5 rounded-xl bg-amber-50/70 border border-amber-200/80 text-center space-y-2">
+                <div class="w-11 h-11 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto text-lg">
+                    <i class="fa-solid fa-file-circle-question"></i>
+                </div>
+                <p class="text-xs sm:text-sm font-bold text-amber-950">Belum Ada Data Raport</p>
+                <p class="text-xs text-amber-800/80 max-w-md mx-auto">
+                    ${escapeHtml(user.nama)} belum memiliki raport atau catatan kekurangan materi untuk bahan evaluasi.
+                </p>
+            </div>
+        `;
+        return;
+    }
+
+    if (badgeEl) {
+        badgeEl.textContent = `Memiliki ${userRaports.length} Raport`;
+        badgeEl.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700';
+    }
+
+    listEl.innerHTML = userRaports.map(r => `
+        <div class="p-4 rounded-xl border border-surface-200/80 bg-surface-50/40 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="text-xs sm:text-sm font-bold text-surface-900">${escapeHtml(r.mapel || 'Materi Umum')}</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-100 text-violet-700">${escapeHtml(r.predikat || 'Baik')}</span>
+                        <span class="px-2 py-0.5 rounded-md text-[10px] font-semibold ${r.status === 'Dikirim' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-surface-100 text-surface-600 border border-surface-200'}">${escapeHtml(r.status || 'Draft')}</span>
+                    </div>
+                    <p class="text-[11px] text-surface-400 mt-0.5">Periode: ${formatPeriode(r.periode)} • ${escapeHtml(r.kelas || user.jabatan || '-')}</p>
+                </div>
+                <div class="flex items-center gap-1">
+                    <button type="button" onclick="viewRaportDetail('${r.id}')" class="p-1.5 rounded-lg hover:bg-violet-100 text-surface-500 hover:text-violet-700 transition-colors" title="Lihat Raport">
+                        <i class="fa-solid fa-eye text-xs"></i>
+                    </button>
+                    <button type="button" onclick="downloadSingleRaport('${r.id}')" class="p-1.5 rounded-lg hover:bg-emerald-100 text-surface-500 hover:text-emerald-700 transition-colors" title="Cetak PDF">
+                        <i class="fa-solid fa-download text-xs"></i>
+                    </button>
+                    <button type="button" onclick="sendRaportToWhatsApp('${r.id}')" class="p-1.5 rounded-lg hover:bg-emerald-100 text-surface-500 hover:text-emerald-700 transition-colors" title="Kirim WA">
+                        <i class="fa-brands fa-whatsapp text-xs"></i>
+                    </button>
+                    <button type="button" onclick="openEditRaportModal('${r.id}')" class="p-1.5 rounded-lg hover:bg-blue-100 text-surface-500 hover:text-blue-700 transition-colors" title="Edit Raport">
+                        <i class="fa-solid fa-pen text-xs"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-rose-50/80 border border-rose-200/80">
+                <p class="text-[10px] font-bold uppercase text-rose-700 mb-1">
+                    <i class="fa-solid fa-triangle-exclamation mr-1"></i> Pesan Kekurangan / Bahan Evaluasi:
+                </p>
+                <p class="text-xs text-surface-800 leading-relaxed whitespace-pre-line">${escapeHtml(r.kekurangan || '-')}</p>
+            </div>
+
+            ${r.saran ? `
+            <div class="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200/70">
+                <p class="text-[10px] font-bold uppercase text-emerald-700 mb-1">
+                    <i class="fa-solid fa-lightbulb mr-1"></i> Saran Pendampingan:
+                </p>
+                <p class="text-xs text-surface-700 leading-relaxed whitespace-pre-line">${escapeHtml(r.saran)}</p>
+            </div>
+            ` : ''}
+        </div>
+    `).join('');
+}
+
+function openAddRaportForUser(nama) {
+    openAddRaportModal();
+    const select = document.getElementById('raport-nama');
+    if (select && nama) {
+        select.value = nama;
+        if (typeof select.onchange === 'function') select.onchange();
+    }
+}
+
+function renderDetailPencapaian(user) {
+    const listEl = document.getElementById('detail-pencapaian-list');
+    const catsEl = document.getElementById('detail-pencapaian-categories');
+    const summaryEl = document.getElementById('detail-pencapaian-summary');
+    const barEl = document.getElementById('detail-pencapaian-progress-bar');
+    const heroEl = document.getElementById('detail-hero-pencapaian');
+    if (!listEl) return;
+
+    const items = getUserPencapaianList(user);
+    const total = items.length;
+    const done = items.filter(i => i.checked).length;
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+    if (summaryEl) summaryEl.textContent = `${done} / ${total} Tercapai (${pct}%)`;
+    if (barEl) barEl.style.width = `${pct}%`;
+    if (heroEl) heroEl.textContent = `${pct}%`;
+
+    const categories = ['semua', ...Array.from(new Set(items.map(i => i.category || 'Lainnya')))];
+    if (catsEl) {
+        catsEl.innerHTML = categories.map(cat => {
+            const active = currentDetailPencapaianCategory === cat;
+            const label = cat === 'semua' ? 'Semua' : cat;
+            return `
+                <button type="button" onclick="setDetailPencapaianCategory('${escapeHtml(cat)}')"
+                    class="px-2.5 py-1 rounded-lg text-[11px] font-semibold shrink-0 transition-all ${active ? 'bg-indigo-600 text-white' : 'bg-surface-100 text-surface-600 hover:bg-surface-200'}">
+                    ${escapeHtml(label)}
+                </button>
+            `;
+        }).join('');
+    }
+
+    const visibleItems = currentDetailPencapaianCategory === 'semua'
+        ? items
+        : items.filter(i => (i.category || 'Lainnya') === currentDetailPencapaianCategory);
+
+    if (visibleItems.length === 0) {
+        listEl.innerHTML = `<p class="text-xs text-surface-400 text-center py-6">Belum ada item pencapaian pada kategori ini.</p>`;
+        return;
+    }
+
+    listEl.innerHTML = visibleItems.map(item => `
+        <div class="p-3 rounded-xl border transition-all flex items-center justify-between gap-3 ${item.checked ? 'bg-emerald-50/60 border-emerald-200' : 'bg-white border-surface-200/80 hover:border-indigo-200'}">
+            <button type="button" onclick="togglePencapaianItem('${escapeHtml(item.id)}')" class="flex items-center gap-3 min-w-0 flex-1 text-left">
+                <span class="w-5 h-5 rounded-md flex items-center justify-center shrink-0 border transition-all ${item.checked ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-surface-50 border-surface-300 text-transparent hover:border-indigo-500'}">
+                    <i class="fa-solid fa-check text-[10px]"></i>
+                </span>
+                <div class="min-w-0 flex-1">
+                    <p class="text-xs sm:text-sm font-semibold ${item.checked ? 'text-emerald-950' : 'text-surface-800'} break-words">${escapeHtml(item.title)}</p>
+                    <div class="flex flex-wrap items-center gap-1.5 mt-0.5">
+                        <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-surface-100 text-surface-600">${escapeHtml(item.category || 'Materi')}</span>
+                        ${item.checked && item.checkedAt ? `<span class="text-[10px] text-emerald-700 font-medium"><i class="fa-solid fa-check-double mr-0.5"></i>Dicek ${formatDateDisplay(item.checkedAt)}</span>` : ''}
+                    </div>
+                </div>
+            </button>
+            <button type="button" onclick="deletePencapaianItem('${escapeHtml(item.id)}')"
+                class="p-1.5 rounded-lg text-surface-300 hover:text-rose-600 hover:bg-rose-50 transition-colors shrink-0" title="Hapus target">
+                <i class="fa-solid fa-trash-can text-xs"></i>
+            </button>
+        </div>
+    `).join('');
+}
+
+function setDetailPencapaianCategory(cat) {
+    currentDetailPencapaianCategory = cat;
+    const user = allKaryawanData.find(k => k.id === currentDetailCaberawitId);
+    if (user) renderDetailPencapaian(user);
+}
+
+async function persistUserPencapaian(user, updatedList) {
+    user.pencapaian = updatedList;
+    saveKaryawanToLocalStorage();
+    if (isFirebaseConnected) {
+        if (activeEngine === 'rtdb' && rtdb) {
+            rtdb.ref(`karyawan/${user.id}/pencapaian`).set(updatedList).catch(() => {});
+        } else if (activeEngine === 'firestore' && db) {
+            db.collection('karyawan').doc(user.id).update({ pencapaian: updatedList }).catch(() => {});
+        }
+    }
+    renderDetailPencapaian(user);
+}
+
+async function togglePencapaianItem(itemId) {
+    const user = allKaryawanData.find(k => k.id === currentDetailCaberawitId);
+    if (!user) return;
+
+    const list = getUserPencapaianList(user).map(item => ({ ...item }));
+    const target = list.find(i => i.id === itemId);
+    if (!target) return;
+
+    target.checked = !target.checked;
+    target.checkedAt = target.checked ? formatDateISO(new Date()) : '';
+
+    await persistUserPencapaian(user, list);
+    showToast(target.checked ? `✅ "${target.title}" ditandai tercapai!` : `Checklist "${target.title}" dibatalkan.`, target.checked ? 'success' : 'info');
+}
+
+async function handleAddPencapaianItem(event) {
+    event.preventDefault();
+    const user = allKaryawanData.find(k => k.id === currentDetailCaberawitId);
+    if (!user) return;
+
+    const titleInput = document.getElementById('pencapaian-new-title');
+    const catInput = document.getElementById('pencapaian-new-category');
+    const title = titleInput ? titleInput.value.trim() : '';
+    const category = catInput ? catInput.value : 'Bacaan';
+
+    if (!title) return;
+
+    const list = getUserPencapaianList(user).map(item => ({ ...item }));
+    list.push({
+        id: `ach-custom-${Date.now()}`,
+        title,
+        category,
+        checked: false,
+        checkedAt: '',
+        isCustom: true
+    });
+
+    if (titleInput) titleInput.value = '';
+    await persistUserPencapaian(user, list);
+    showToast(`Target "${title}" ditambahkan!`, 'success');
+}
+
+async function deletePencapaianItem(itemId) {
+    const user = allKaryawanData.find(k => k.id === currentDetailCaberawitId);
+    if (!user) return;
+
+    const list = getUserPencapaianList(user).filter(i => i.id !== itemId);
+    await persistUserPencapaian(user, list);
+    showToast('Item pencapaian dihapus.', 'info');
 }
 
 
